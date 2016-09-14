@@ -93,7 +93,7 @@ func main() {
 		hostSplited := strings.Split(originalHost, ".")
 		lastPartIndex := 0
 		for i, hostPart := range hostSplited {
-			if hostPart == "ccnproxy-https" || hostPart == "ccnproxy" {
+			if hostPart == "ccnproxy-ssl" || hostPart == "ccnproxy-secure" || hostPart == "ccnproxy-https" || hostPart == "ccnproxy" {
 				lastPartIndex = i
 			}
 		}
@@ -103,7 +103,7 @@ func main() {
 		}
 
 		pr.URL.Host = strings.Join(hostSplited[0:lastPartIndex], ".")
-		if hostSplited[lastPartIndex] == "ccnproxy-https" {
+		if hostSplited[lastPartIndex] == "ccnproxy-https" || hostSplited[lastPartIndex] == "ccnproxy-secure" || hostSplited[lastPartIndex] == "ccnproxy-ssl" {
 			pr.URL.Scheme = "https"
 		}
 	}
