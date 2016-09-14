@@ -1,0 +1,16 @@
+hash: 8776b72b857522095fe1b5a7f38ac157c6cc71f8cd3d410ce6cf05bbe46c1a64
+updated: 2016-09-09T10:40:24.674269234+09:00
+imports:
+- name: github.com/fukata/golang-stats-api-handler
+  version: ab9f90f16caab828afda479fd34bfbbbba2efcee
+- name: github.com/lestrrat/go-apache-logformat
+  version: 0f5817c5c9e626d408c4d68e3d90fd7697e97d5f
+- name: github.com/lestrrat/go-server-starter-listener
+  version: 00dd68592c85334ce94a28199ec7961352c0ba6d
+- name: github.com/pkg/errors
+  version: 17b591df37844cde689f4d5813e5cea0927d8dd2
+- name: github.com/renstrom/shortuuid
+  version: d728e00b727de969356736fabe7c6f405347a26c
+- name: github.com/satori/go.uuid
+  version: 0aa62d5ddceb50dbcb909d790b5345affd3669b6
+testImports: []
