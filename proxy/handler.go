@@ -2,12 +2,12 @@ package proxy_handler
 
 // this class is based on https://github.com/r7kamura/entoverse
 
-import(
+import (
+	"github.com/renstrom/shortuuid"
 	"io"
 	"log"
-	"net/url"
 	"net/http"
-	"github.com/renstrom/shortuuid"
+	"net/url"
 )
 
 const (
@@ -33,15 +33,14 @@ type ProxyStatus struct {
 // Provide host-based proxy server.
 type Proxy struct {
 	RequestConverter func(originalRequest, proxyRequest *http.Request, proxyStatus *ProxyStatus)
-	Transport http.RoundTripper
+	Transport        http.RoundTripper
 }
-
 
 // Create a request-based reverse-proxy.
 func NewProxyWithRequestConverter(requestConverter func(*http.Request, *http.Request, *ProxyStatus)) *Proxy {
 	return &Proxy{
 		RequestConverter: requestConverter,
-		Transport: http.DefaultTransport,
+		Transport:        http.DefaultTransport,
 	}
 }
 
@@ -58,7 +57,7 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, originalRequest *http.
 
 	// Create a new proxy request object by coping the original request.
 	proxyRequest := proxy.copyRequest(originalRequest)
-	proxyStatus := &ProxyStatus{ Status: http.StatusOK }
+	proxyStatus := &ProxyStatus{Status: http.StatusOK}
 
 	// Convert an original request into another proxy request.
 	proxy.RequestConverter(originalRequest, proxyRequest, proxyStatus)
@@ -86,7 +85,7 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, originalRequest *http.
 		}
 	}
 	writer.Header().Add(ProxyHeaderName, proxy_id)
-	
+
 	// Copy a status code.
 	writer.WriteHeader(response.StatusCode)
 
@@ -123,13 +122,13 @@ func (proxy *Proxy) copyRequest(originalRequest *http.Request) *http.Request {
 
 	// Append this machine's host name into X-Forwarded-For.
 	/*
-    if requestHost, _, err := net.SplitHostPort(originalRequest.RemoteAddr); err == nil {
-		if originalValues, ok := proxyRequest.Header["X-Forwarded-For"]; ok {
-			requestHost = strings.Join(originalValues, ", ") + ", " + requestHost
-		}
-		proxyRequest.Header.Set("X-Forwarded-For", requestHost)
-	}
-    */
+		    if requestHost, _, err := net.SplitHostPort(originalRequest.RemoteAddr); err == nil {
+				if originalValues, ok := proxyRequest.Header["X-Forwarded-For"]; ok {
+					requestHost = strings.Join(originalValues, ", ") + ", " + requestHost
+				}
+				proxyRequest.Header.Set("X-Forwarded-For", requestHost)
+			}
+	*/
 
 	return proxyRequest
 }

@@ -1,22 +1,30 @@
 package main
 
-
-import(
+import (
 	"fmt"
-	"os"
-	"strings"
+	"github.com/fukata/golang-stats-api-handler"
+	"github.com/jessevdk/go-flags"
+	"github.com/kazeburo/chocon/proxy"
+	"github.com/lestrrat/go-apache-logformat"
+	"github.com/lestrrat/go-file-rotatelogs"
+	"github.com/lestrrat/go-server-starter-listener"
 	"net"
 	"net/http"
-	"github.com/lestrrat/go-apache-logformat"
-	"github.com/lestrrat/go-server-starter-listener"
-	"github.com/fukata/golang-stats-api-handler"
-	"github.com/kazeburo/chocon/proxy"
+	"os"
+	"strings"
+	"time"
 )
 
+type cmdOpts struct {
+	Listen    string `short:"l" long:"listen" default:"0.0.0.0" description:"address to bind"`
+	Port      string `short:"p" long:"port" default:"3000" description:"Port number to bind"`
+	LogDir    string `long:"access-log-dir" default:"" description:"directory to store logfiles"`
+	LogRotate int64  `long:"access-log-rotate" default:"30" description:"Number of day before remove logs"`
+}
 
 func addStatsHandler(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.Index(r.URL.Path, "/.api/stats") == 0  {
+		if strings.Index(r.URL.Path, "/.api/stats") == 0 {
 			stats_api.Handler(w, r)
 		} else {
 			h.ServeHTTP(w, r)
@@ -24,14 +32,65 @@ func addStatsHandler(h http.Handler) http.Handler {
 	})
 }
 
+func addLogHandler(h http.Handler, log_dir string, log_rotate int64) http.Server {
+	apache_log, err := apachelog.New(`%h %l %u %t "%r" %>s %b "%v" %{X-Chocon-Req}i`)
+	if err != nil {
+		panic(fmt.Sprintf("could not create logger: %v", err))
+	}
+
+	if log_dir == "stdout" {
+		return http.Server{
+			Handler: apache_log.Wrap(h, os.Stdout),
+		}
+	} else if log_dir == "" {
+		return http.Server{
+			Handler: apache_log.Wrap(h, os.Stderr),
+		}
+	} else if log_dir == "none" {
+		return http.Server{
+			Handler: h,
+		}
+	}
+
+	log_file := log_dir
+	link_name := log_dir
+	if !strings.HasSuffix(log_dir, "/") {
+		log_file += "/"
+		link_name += "/"
+
+	}
+	log_file += "access_log.%Y%m%d%H%M"
+	link_name += "current"
+
+	rl := rotatelogs.NewRotateLogs(
+		log_file,
+	)
+
+	rl.LinkName = link_name
+	rl.RotationTime = 86400 * time.Second
+	rl.MaxAge = time.Duration(log_rotate) * 86400 * time.Second
+	rl.Offset = 0
+
+	return http.Server{
+		Handler: apache_log.Wrap(h, rl),
+	}
+}
+
 func main() {
-	requestConverter := func(r *http.Request, pr *http.Request, ps *proxy_handler.ProxyStatus)  {
+	opts := cmdOpts{}
+	psr := flags.NewParser(&opts, flags.Default)
+	_, err := psr.Parse()
+	if err != nil {
+		os.Exit(1)
+	}
+
+	requestConverter := func(r *http.Request, pr *http.Request, ps *proxy_handler.ProxyStatus) {
 		if r.Host == "" {
 			ps.Status = http.StatusBadRequest
 			return
 		}
 		originalHost := r.Host
-		hostSplited := strings.Split(originalHost,".")
+		hostSplited := strings.Split(originalHost, ".")
 		lastPartIndex := 0
 		for i, hostPart := range hostSplited {
 			if hostPart == "ccnproxy-https" || hostPart == "ccnproxy" {
@@ -45,7 +104,7 @@ func main() {
 
 		pr.URL.Host = strings.Join(hostSplited[0:lastPartIndex], ".")
 		if hostSplited[lastPartIndex] == "ccnproxy-https" {
-			pr.URL.Scheme = "https";
+			pr.URL.Scheme = "https"
 		}
 	}
 	proxyHandler := addStatsHandler(proxy_handler.NewProxyWithRequestConverter(requestConverter))
@@ -53,21 +112,12 @@ func main() {
 	l, err := ss.NewListener()
 	if l == nil || err != nil {
 		// Fallback if not running under Server::Starter
-		l, err = net.Listen("tcp", ":3000")
+		l, err = net.Listen("tcp", fmt.Sprintf("%s:%s", opts.Listen, opts.Port))
 		if err != nil {
-			panic("Failed to listen to port 8080")
+			panic(fmt.Sprintf("Failed to listen to port %s:%s", opts.Listen, opts.Port))
 		}
 	}
 
-	apache_log, err := apachelog.New(`%h %l %u %t "%r" %>s %b "%v" %{X-Chocon-Req}i`)
-	if err != nil {
-		panic(fmt.Sprintf("could not create logger: %v",err))
-	}
-	// logger := apachelog.CombinedLog.Clone()
-	server := http.Server{
-		Handler: apache_log.Wrap(proxyHandler, os.Stderr),
-	}
+	server := addLogHandler(proxyHandler, opts.LogDir, opts.LogRotate)
 	server.Serve(l)
 }
-
-
