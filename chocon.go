@@ -62,14 +62,12 @@ func addLogHandler(h http.Handler, log_dir string, log_rotate int64) http.Server
 	log_file += "access_log.%Y%m%d%H%M"
 	link_name += "current"
 
-	rl := rotatelogs.NewRotateLogs(
+	rl := rotatelogs.New(
 		log_file,
+		rotatelogs.WithLinkName(link_name),
+		rotatelogs.WithMaxAge(time.Duration(log_rotate) * 86400 * time.Second),
+		rotatelogs.WithRotationTime(time.Second * 86400),
 	)
-
-	rl.LinkName = link_name
-	rl.RotationTime = 86400 * time.Second
-	rl.MaxAge = time.Duration(log_rotate) * 86400 * time.Second
-	rl.Offset = 0
 
 	return http.Server{
 		Handler: apache_log.Wrap(h, rl),
