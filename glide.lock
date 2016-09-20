@@ -1,8 +1,8 @@
 hash: 8776b72b857522095fe1b5a7f38ac157c6cc71f8cd3d410ce6cf05bbe46c1a64
-updated: 2016-09-20T15:01:13.841810529+09:00
+updated: 2016-09-20T17:14:52.724915947+09:00
 imports:
 - name: bitbucket.org/tebeka/strftime
-  version: 2194253a23c090a4d5953b152a3c63fb5da4f5a4+
+  version: 2194253a23c090a4d5953b152a3c63fb5da4f5a4
 - name: github.com/fukata/golang-stats-api-handler
   version: ab9f90f16caab828afda479fd34bfbbbba2efcee
 - name: github.com/jessevdk/go-flags
