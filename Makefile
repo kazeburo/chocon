@@ -1,4 +1,4 @@
-VERSION=0.2.0
+VERSION=0.3.0
 TARGETS_NOVENDOR=$(shell glide novendor)
 
 all: chocon
