@@ -1,4 +1,4 @@
-VERSION=0.0.1
+VERSION=0.2.0
 TARGETS_NOVENDOR=$(shell glide novendor)
 
 all: chocon
@@ -25,4 +25,10 @@ dist:
 
 clean:
 	rm -rf chocon chocon-*.tar.gz
+
+tag:
+	git tag v${VERSION}
+	git push origin v${VERSION}
+	git push origin master
+
 
