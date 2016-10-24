@@ -1,4 +1,5 @@
 VERSION=0.3.0
+LDFLAGS=-ldflags "-X main.Version=${VERSION}"
 TARGETS_NOVENDOR=$(shell glide novendor)
 
 all: chocon
@@ -12,10 +13,10 @@ bundle:
 	glide install
 
 chocon: chocon.go
-	GO15VENDOREXPERIMENT=1 go build chocon.go
+	GO15VENDOREXPERIMENT=1 go build $(LDFLAGS) chocon.go
 
 linux: chocon.go
-	GOOS=linux GOARCH=amd64 GO15VENDOREXPERIMENT=1 go build chocon.go
+	GOOS=linux GOARCH=amd64 GO15VENDOREXPERIMENT=1 go build $(LDFLAGS) chocon.go
 
 fmt:
 	go fmt ./...
