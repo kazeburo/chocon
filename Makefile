@@ -18,7 +18,7 @@ linux: chocon.go
 	GOOS=linux GOARCH=amd64 GO15VENDOREXPERIMENT=1 go build chocon.go
 
 fmt:
-	go fmt ./...
+	@echo $(TARGETS_NOVENDOR) | xargs go fmt
 
 dist:
 	git archive --format tgz HEAD -o chocon-$(VERSION).tar.gz --prefix chocon-$(VERSION)/
