@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/cubicdaiya/chocon/proxy"
 	"github.com/fukata/golang-stats-api-handler"
 	"github.com/jessevdk/go-flags"
+	"github.com/kazeburo/chocon/proxy"
 	"github.com/lestrrat/go-apache-logformat"
 	"github.com/lestrrat/go-file-rotatelogs"
 	"github.com/lestrrat/go-server-starter-listener"
