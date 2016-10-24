@@ -2,17 +2,22 @@ package main
 
 import (
 	"fmt"
+	"github.com/cubicdaiya/chocon/proxy"
 	"github.com/fukata/golang-stats-api-handler"
 	"github.com/jessevdk/go-flags"
-	"github.com/kazeburo/chocon/proxy"
 	"github.com/lestrrat/go-apache-logformat"
 	"github.com/lestrrat/go-file-rotatelogs"
 	"github.com/lestrrat/go-server-starter-listener"
 	"net"
 	"net/http"
 	"os"
+	"runtime"
 	"strings"
 	"time"
+)
+
+var (
+	Version string
 )
 
 type cmdOpts struct {
@@ -20,6 +25,7 @@ type cmdOpts struct {
 	Port      string `short:"p" long:"port" default:"3000" description:"Port number to bind"`
 	LogDir    string `long:"access-log-dir" default:"" description:"directory to store logfiles"`
 	LogRotate int64  `long:"access-log-rotate" default:"30" description:"Number of day before remove logs"`
+	Version   bool   `short:"v" long:"version" description:"Show version"`
 }
 
 func addStatsHandler(h http.Handler) http.Handler {
@@ -65,8 +71,8 @@ func addLogHandler(h http.Handler, log_dir string, log_rotate int64) http.Server
 	rl := rotatelogs.New(
 		log_file,
 		rotatelogs.WithLinkName(link_name),
-		rotatelogs.WithMaxAge(time.Duration(log_rotate) * 86400 * time.Second),
-		rotatelogs.WithRotationTime(time.Second * 86400),
+		rotatelogs.WithMaxAge(time.Duration(log_rotate)*86400*time.Second),
+		rotatelogs.WithRotationTime(time.Second*86400),
 	)
 
 	return http.Server{
@@ -80,6 +86,17 @@ func main() {
 	_, err := psr.Parse()
 	if err != nil {
 		os.Exit(1)
+	}
+
+	if opts.Version {
+		fmt.Printf(`chocon %s
+Compiler: %s %s
+`,
+			Version,
+			runtime.Compiler,
+			runtime.Version())
+		return
+
 	}
 
 	requestConverter := func(r *http.Request, pr *http.Request, ps *proxy_handler.ProxyStatus) {
