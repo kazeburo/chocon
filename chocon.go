@@ -21,11 +21,13 @@ var (
 )
 
 type cmdOpts struct {
-	Listen    string `short:"l" long:"listen" default:"0.0.0.0" description:"address to bind"`
-	Port      string `short:"p" long:"port" default:"3000" description:"Port number to bind"`
-	LogDir    string `long:"access-log-dir" default:"" description:"directory to store logfiles"`
-	LogRotate int64  `long:"access-log-rotate" default:"30" description:"Number of day before remove logs"`
-	Version   bool   `short:"v" long:"version" description:"Show version"`
+	Listen          string `short:"l" long:"listen" default:"0.0.0.0" description:"address to bind"`
+	Port            string `short:"p" long:"port" default:"3000" description:"Port number to bind"`
+	LogDir          string `long:"access-log-dir" default:"" description:"directory to store logfiles"`
+	LogRotate       int64  `long:"access-log-rotate" default:"30" description:"Number of day before remove logs"`
+	Version         bool   `short:"v" long:"version" description:"Show version"`
+	KeepaliveConns  int    `short:"c" default:"2" long:"keepalive-conns" description:"maximun keepalive connections for upstream"`
+	ResponseTimeout int    `long:"response-timeout" default:"30" description:"timeout of response from upstream"`
 }
 
 func addStatsHandler(h http.Handler) http.Handler {
@@ -122,7 +124,24 @@ Compiler: %s %s
 			pr.URL.Scheme = "https"
 		}
 	}
-	proxyHandler := addStatsHandler(proxy_handler.NewProxyWithRequestConverter(requestConverter))
+
+	var transport http.RoundTripper = &http.Transport{
+		// inherited http.DefaultTransport
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		// self-customized values
+		MaxIdleConns:          0,
+		MaxIdleConnsPerHost:   opts.KeepaliveConns,
+		ResponseHeaderTimeout: time.Duration(opts.ResponseTimeout) * time.Second,
+	}
+
+	proxyHandler := addStatsHandler(proxy_handler.NewProxyWithRequestConverter(requestConverter, &transport))
 
 	l, err := ss.NewListener()
 	if l == nil || err != nil {
