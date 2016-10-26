@@ -37,10 +37,10 @@ type Proxy struct {
 }
 
 // Create a request-based reverse-proxy.
-func NewProxyWithRequestConverter(requestConverter func(*http.Request, *http.Request, *ProxyStatus)) *Proxy {
+func NewProxyWithRequestConverter(requestConverter func(*http.Request, *http.Request, *ProxyStatus), transport *http.RoundTripper) *Proxy {
 	return &Proxy{
 		RequestConverter: requestConverter,
-		Transport:        http.DefaultTransport,
+		Transport:        *transport,
 	}
 }
 
