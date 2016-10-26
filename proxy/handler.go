@@ -6,6 +6,7 @@ import (
 	"github.com/renstrom/shortuuid"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 )
@@ -71,7 +72,11 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, originalRequest *http.
 	response, err := proxy.Transport.RoundTrip(proxyRequest)
 	if err != nil {
 		log.Printf("ErrorFromProxy: %v", err)
-		writer.WriteHeader(http.StatusInternalServerError)
+		if err, ok := err.(net.Error); ok && err.Timeout() {
+			writer.WriteHeader(http.StatusGatewayTimeout)
+		} else {
+			writer.WriteHeader(http.StatusInternalServerError)
+		}
 		return
 	}
 
