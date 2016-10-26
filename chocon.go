@@ -136,7 +136,6 @@ Compiler: %s %s
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 		// self-customized values
-		MaxIdleConns:          0,
 		MaxIdleConnsPerHost:   opts.KeepaliveConns,
 		ResponseHeaderTimeout: time.Duration(opts.ResponseTimeout) * time.Second,
 	}
