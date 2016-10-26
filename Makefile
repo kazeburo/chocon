@@ -13,10 +13,10 @@ bundle:
 	glide install
 
 chocon: chocon.go
-	GO15VENDOREXPERIMENT=1 go build $(LDFLAGS) chocon.go
+	go build $(LDFLAGS) chocon.go
 
 linux: chocon.go
-	GOOS=linux GOARCH=amd64 GO15VENDOREXPERIMENT=1 go build $(LDFLAGS) chocon.go
+	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) chocon.go
 
 fmt:
 	@echo $(TARGETS_NOVENDOR) | xargs go fmt
