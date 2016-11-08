@@ -2,6 +2,10 @@
 
 **chocon** is a simple proxy server for persisting connections between upstream servers.
 
+# Requirements
+
+**chocon** requires Go1.7.3 or later.
+
 # Installation
 
 ```
