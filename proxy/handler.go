@@ -126,14 +126,12 @@ func (proxy *Proxy) copyRequest(originalRequest *http.Request) *http.Request {
 	}
 
 	// Append this machine's host name into X-Forwarded-For.
-	/*
-		    if requestHost, _, err := net.SplitHostPort(originalRequest.RemoteAddr); err == nil {
-				if originalValues, ok := proxyRequest.Header["X-Forwarded-For"]; ok {
-					requestHost = strings.Join(originalValues, ", ") + ", " + requestHost
-				}
-				proxyRequest.Header.Set("X-Forwarded-For", requestHost)
-			}
-	*/
+	// if requestHost, _, err := net.SplitHostPort(originalRequest.RemoteAddr); err == nil {
+	// 	if originalValues, ok := proxyRequest.Header["X-Forwarded-For"]; ok {
+	// 		requestHost = strings.Join(originalValues, ", ") + ", " + requestHost
+	// 	}
+	// 	proxyRequest.Header.Set("X-Forwarded-For", requestHost)
+	// }
 
 	return proxyRequest
 }
