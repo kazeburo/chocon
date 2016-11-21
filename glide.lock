@@ -1,22 +1,22 @@
 hash: 8776b72b857522095fe1b5a7f38ac157c6cc71f8cd3d410ce6cf05bbe46c1a64
-updated: 2016-09-20T17:14:52.724915947+09:00
+updated: 2016-11-21T15:51:52.291629244+09:00
 imports:
 - name: bitbucket.org/tebeka/strftime
   version: 2194253a23c090a4d5953b152a3c63fb5da4f5a4
 - name: github.com/fukata/golang-stats-api-handler
   version: ab9f90f16caab828afda479fd34bfbbbba2efcee
 - name: github.com/jessevdk/go-flags
-  version: 4cc2832a6e6d1d3b815e2b9d544b2a4dfb3ce8fa
+  version: 8bc97d602c3bfeb5fc6fc9b5a9c898f245495637
 - name: github.com/lestrrat/go-apache-logformat
-  version: 0f5817c5c9e626d408c4d68e3d90fd7697e97d5f
+  version: b900d0f73560d153d85f9c0c619d07a5b9d829be
 - name: github.com/lestrrat/go-file-rotatelogs
   version: ab335c655133cea61d8164853c1ed0e97d6c77cb
 - name: github.com/lestrrat/go-server-starter-listener
   version: 00dd68592c85334ce94a28199ec7961352c0ba6d
 - name: github.com/pkg/errors
-  version: a887431f7f6ef7687b556dbf718d9f351d4858a0
+  version: 248dadf4e9068a0b3e79f02ed0a610d935de5302
 - name: github.com/renstrom/shortuuid
   version: d728e00b727de969356736fabe7c6f405347a26c
 - name: github.com/satori/go.uuid
-  version: 0aa62d5ddceb50dbcb909d790b5345affd3669b6
+  version: b061729afc07e77a8aa4fad0a2fd840958f1942a
 testImports: []

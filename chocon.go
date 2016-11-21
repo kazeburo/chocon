@@ -43,7 +43,7 @@ func addStatsHandler(h http.Handler) http.Handler {
 }
 
 func addLogHandler(h http.Handler, log_dir string, log_rotate int64) http.Server {
-	apache_log, err := apachelog.New(`%h %l %u %t "%r" %>s %b "%v" %{X-Chocon-Req}i`)
+	apache_log, err := apachelog.New(`%h %l %u %t "%r" %>s %b "%v" %T.%{msec_frac}t %{X-Chocon-Req}i`)
 	if err != nil {
 		panic(fmt.Sprintf("could not create logger: %v", err))
 	}
