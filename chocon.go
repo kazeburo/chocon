@@ -122,6 +122,7 @@ Compiler: %s %s
 		}
 
 		pr.URL.Host = strings.Join(hostSplited[0:lastPartIndex], ".")
+		pr.Host = pr.URL.Host
 		if hostSplited[lastPartIndex] == "ccnproxy-https" || hostSplited[lastPartIndex] == "ccnproxy-secure" || hostSplited[lastPartIndex] == "ccnproxy-ssl" {
 			pr.URL.Scheme = "https"
 		}
