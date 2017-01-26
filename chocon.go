@@ -2,18 +2,19 @@ package main
 
 import (
 	"fmt"
-	"github.com/fukata/golang-stats-api-handler"
-	"github.com/jessevdk/go-flags"
-	"github.com/kazeburo/chocon/proxy"
-	"github.com/lestrrat/go-apache-logformat"
-	"github.com/lestrrat/go-file-rotatelogs"
-	"github.com/lestrrat/go-server-starter-listener"
 	"net"
 	"net/http"
 	"os"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/fukata/golang-stats-api-handler"
+	"github.com/jessevdk/go-flags"
+	"github.com/kazeburo/chocon/proxy"
+	"github.com/lestrrat/go-apache-logformat"
+	"github.com/lestrrat/go-file-rotatelogs"
+	"github.com/lestrrat/go-server-starter-listener"
 )
 
 var (
@@ -72,12 +73,15 @@ func addLogHandler(h http.Handler, log_dir string, log_rotate int64) http.Server
 	log_file += "access_log.%Y%m%d%H%M"
 	link_name += "current"
 
-	rl := rotatelogs.New(
+	rl, err := rotatelogs.New(
 		log_file,
 		rotatelogs.WithLinkName(link_name),
 		rotatelogs.WithMaxAge(time.Duration(log_rotate)*86400*time.Second),
 		rotatelogs.WithRotationTime(time.Second*86400),
 	)
+	if err != nil {
+		panic(fmt.Sprintf("rotatelogs.New failed: %v", err))
+	}
 
 	return http.Server{
 		Handler: apache_log.Wrap(h, rl),
