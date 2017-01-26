@@ -1,22 +1,40 @@
 hash: 8776b72b857522095fe1b5a7f38ac157c6cc71f8cd3d410ce6cf05bbe46c1a64
-updated: 2016-11-21T15:51:52.291629244+09:00
+updated: 2017-01-26T20:24:29.7292639+09:00
 imports:
-- name: bitbucket.org/tebeka/strftime
-  version: 2194253a23c090a4d5953b152a3c63fb5da4f5a4
 - name: github.com/fukata/golang-stats-api-handler
   version: ab9f90f16caab828afda479fd34bfbbbba2efcee
+  subpackages:
+  - github.com/fukata/golang-stats-api-handler
 - name: github.com/jessevdk/go-flags
-  version: 8bc97d602c3bfeb5fc6fc9b5a9c898f245495637
+  version: 4e64e4a4e2552194cf594243e23aa9baf3b4297e
+  subpackages:
+  - github.com/jessevdk/go-flags
 - name: github.com/lestrrat/go-apache-logformat
-  version: b900d0f73560d153d85f9c0c619d07a5b9d829be
+  version: aef9f5955f335dc2fbb969c95b849347b15e36c9
+  subpackages:
+  - github.com/lestrrat/go-apache-logformat
 - name: github.com/lestrrat/go-file-rotatelogs
-  version: ab335c655133cea61d8164853c1ed0e97d6c77cb
+  version: 505c036604b3326a96097ca91865df30043093a5
+  subpackages:
+  - github.com/lestrrat/go-file-rotatelogs
 - name: github.com/lestrrat/go-server-starter-listener
   version: 00dd68592c85334ce94a28199ec7961352c0ba6d
+  subpackages:
+  - github.com/lestrrat/go-server-starter-listener
+- name: github.com/lestrrat/go-strftime
+  version: 04ef93e285313c8978cbc7cad26d2aa7a9927451
+  subpackages:
+  - github.com/lestrrat/go-strftime
 - name: github.com/pkg/errors
   version: 248dadf4e9068a0b3e79f02ed0a610d935de5302
+  subpackages:
+  - github.com/pkg/errors
 - name: github.com/renstrom/shortuuid
   version: d728e00b727de969356736fabe7c6f405347a26c
+  subpackages:
+  - github.com/renstrom/shortuuid
 - name: github.com/satori/go.uuid
   version: b061729afc07e77a8aa4fad0a2fd840958f1942a
-testImports: []
+  subpackages:
+  - github.com/satori/go.uuid
+devImports: []
