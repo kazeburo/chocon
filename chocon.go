@@ -112,8 +112,12 @@ Compiler: %s %s
 			ps.Status = http.StatusBadRequest
 			return
 		}
-		originalHost := r.Host
-		hostSplited := strings.Split(originalHost, ".")
+		host, _, err := net.SplitHostPort(r.Host)
+		if err != nil {
+			ps.Status = http.StatusBadRequest
+			return
+		}
+		hostSplited := strings.Split(host, ".")
 		lastPartIndex := 0
 		for i, hostPart := range hostSplited {
 			if hostPart == "ccnproxy-ssl" || hostPart == "ccnproxy-secure" || hostPart == "ccnproxy-https" || hostPart == "ccnproxy" {
