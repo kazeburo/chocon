@@ -112,11 +112,7 @@ Compiler: %s %s
 			ps.Status = http.StatusBadRequest
 			return
 		}
-		host, _, err := net.SplitHostPort(r.Host)
-		if err != nil {
-			ps.Status = http.StatusBadRequest
-			return
-		}
+		host := strings.Split(r.Host, ":")[0]
 		hostSplited := strings.Split(host, ".")
 		lastPartIndex := 0
 		for i, hostPart := range hostSplited {
