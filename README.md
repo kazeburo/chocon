@@ -38,7 +38,7 @@ Application Options:
 --access-log-dir=     directory to store logfiles
 --access-log-rotate=  Number of day before remove logs (default: 30)
 -v, --version             Show version
--c, --keepalive-conns=    maximun keepalive connections for upstream (default: 2)
+-c, --keepalive-conns=    maximum keepalive connections for upstream (default: 2)
 --read-timeout=       timeout of reading request (default: 30)
 --write-timeout=      timeout of writing response (default: 90)
 --proxy-read-timeout= timeout of reading response from upstream (default: 60)

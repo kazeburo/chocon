@@ -27,7 +27,7 @@ type cmdOpts struct {
 	LogDir           string `long:"access-log-dir" default:"" description:"directory to store logfiles"`
 	LogRotate        int64  `long:"access-log-rotate" default:"30" description:"Number of day before remove logs"`
 	Version          bool   `short:"v" long:"version" description:"Show version"`
-	KeepaliveConns   int    `short:"c" default:"2" long:"keepalive-conns" description:"maximun keepalive connections for upstream"`
+	KeepaliveConns   int    `short:"c" default:"2" long:"keepalive-conns" description:"maximum keepalive connections for upstream"`
 	ReadTimeout      int    `long:"read-timeout" default:"30" description:"timeout of reading request"`
 	WriteTimeout     int    `long:"write-timeout" default:"90" description:"timeout of writing response"`
 	ProxyReadTimeout int    `long:"proxy-read-timeout" default:"60" description:"timeout of reading response from upstream"`
