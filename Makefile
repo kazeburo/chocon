@@ -18,6 +18,9 @@ chocon: chocon.go
 linux: chocon.go
 	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) chocon.go
 
+check:
+	go test -v $(TARGETS_NOVENDOR)
+
 fmt:
 	@echo $(TARGETS_NOVENDOR) | xargs go fmt
 
