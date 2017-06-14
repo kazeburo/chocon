@@ -43,40 +43,40 @@ func addStatsHandler(h http.Handler) http.Handler {
 	})
 }
 
-func addLogHandler(h http.Handler, log_dir string, log_rotate int64) http.Server {
-	apache_log, err := apachelog.New(`%h %l %u %t "%r" %>s %b "%v" %T.%{msec_frac}t %{X-Chocon-Req}i`)
+func addLogHandler(h http.Handler, logDir string, logRotate int64) http.Server {
+	apacheLog, err := apachelog.New(`%h %l %u %t "%r" %>s %b "%v" %T.%{msec_frac}t %{X-Chocon-Req}i`)
 	if err != nil {
 		panic(fmt.Sprintf("could not create logger: %v", err))
 	}
 
-	if log_dir == "stdout" {
+	if logDir == "stdout" {
 		return http.Server{
-			Handler: apache_log.Wrap(h, os.Stdout),
+			Handler: apacheLog.Wrap(h, os.Stdout),
 		}
-	} else if log_dir == "" {
+	} else if logDir == "" {
 		return http.Server{
-			Handler: apache_log.Wrap(h, os.Stderr),
+			Handler: apacheLog.Wrap(h, os.Stderr),
 		}
-	} else if log_dir == "none" {
+	} else if logDir == "none" {
 		return http.Server{
 			Handler: h,
 		}
 	}
 
-	log_file := log_dir
-	link_name := log_dir
-	if !strings.HasSuffix(log_dir, "/") {
-		log_file += "/"
-		link_name += "/"
+	logFile := logDir
+	linkName := logDir
+	if !strings.HasSuffix(logDir, "/") {
+		logFile += "/"
+		linkName += "/"
 
 	}
-	log_file += "access_log.%Y%m%d%H%M"
-	link_name += "current"
+	logFile += "access_log.%Y%m%d%H%M"
+	linkName += "current"
 
 	rl, err := rotatelogs.New(
-		log_file,
-		rotatelogs.WithLinkName(link_name),
-		rotatelogs.WithMaxAge(time.Duration(log_rotate)*86400*time.Second),
+		logFile,
+		rotatelogs.WithLinkName(linkName),
+		rotatelogs.WithMaxAge(time.Duration(logRotate)*86400*time.Second),
 		rotatelogs.WithRotationTime(time.Second*86400),
 	)
 	if err != nil {
@@ -84,7 +84,7 @@ func addLogHandler(h http.Handler, log_dir string, log_rotate int64) http.Server
 	}
 
 	return http.Server{
-		Handler: apache_log.Wrap(h, rl),
+		Handler: apacheLog.Wrap(h, rl),
 	}
 }
 
@@ -107,7 +107,7 @@ Compiler: %s %s
 
 	}
 
-	requestConverter := func(r *http.Request, pr *http.Request, ps *proxy_handler.ProxyStatus) {
+	requestConverter := func(r *http.Request, pr *http.Request, ps *proxy.ProxyStatus) {
 		if r.Host == "" {
 			ps.Status = http.StatusBadRequest
 			return
@@ -147,7 +147,7 @@ Compiler: %s %s
 		ResponseHeaderTimeout: time.Duration(opts.ProxyReadTimeout) * time.Second,
 	}
 
-	proxyHandler := addStatsHandler(proxy_handler.NewProxyWithRequestConverter(requestConverter, &transport))
+	proxyHandler := addStatsHandler(proxy.NewProxyWithRequestConverter(requestConverter, &transport))
 
 	l, err := ss.NewListener()
 	if l == nil || err != nil {

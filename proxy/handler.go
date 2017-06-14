@@ -1,14 +1,15 @@
-package proxy_handler
+package proxy
 
 // this class is based on https://github.com/r7kamura/entoverse
 
 import (
-	"github.com/renstrom/shortuuid"
 	"io"
 	"log"
 	"net"
 	"net/http"
 	"net/url"
+
+	"github.com/renstrom/shortuuid"
 )
 
 const (
@@ -53,8 +54,8 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, originalRequest *http.
 	}
 
 	// Set Proxied
-	proxy_id := shortuuid.New()
-	originalRequest.Header.Set(ProxyHeaderName, proxy_id)
+	proxyID := shortuuid.New()
+	originalRequest.Header.Set(ProxyHeaderName, proxyID)
 
 	// Create a new proxy request object by coping the original request.
 	proxyRequest := proxy.copyRequest(originalRequest)
@@ -89,7 +90,7 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, originalRequest *http.
 			writer.Header().Add(key, value)
 		}
 	}
-	writer.Header().Add(ProxyHeaderName, proxy_id)
+	writer.Header().Add(ProxyHeaderName, proxyID)
 
 	// Copy a status code.
 	writer.WriteHeader(response.StatusCode)
@@ -101,10 +102,10 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, originalRequest *http.
 // Create a new proxy request with some modifications from an original request.
 func (proxy *Proxy) copyRequest(originalRequest *http.Request) *http.Request {
 	proxyRequest := new(http.Request)
-	proxyUrl := new(url.URL)
+	proxyURL := new(url.URL)
 	*proxyRequest = *originalRequest
-	*proxyUrl = *originalRequest.URL
-	proxyRequest.URL = proxyUrl
+	*proxyURL = *originalRequest.URL
+	proxyRequest.URL = proxyURL
 	proxyRequest.Proto = "HTTP/1.1"
 	proxyRequest.ProtoMajor = 1
 	proxyRequest.ProtoMinor = 1
