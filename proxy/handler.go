@@ -17,15 +17,15 @@ const (
 )
 
 // These headers won't be copied from original request to proxy request.
-var ignoredHeaderNames = []string{
-	"Connection",
-	"Keep-Alive",
-	"Proxy-Authenticate",
-	"Proxy-Authorization",
-	"Te",
-	"Trailers",
-	"Transfer-Encoding",
-	"Upgrade",
+var ignoredHeaderNames = map[string]struct{}{
+	"Connection":          struct{}{},
+	"Keep-Alive":          struct{}{},
+	"Proxy-Authenticate":  struct{}{},
+	"Proxy-Authorization": struct{}{},
+	"Te":                struct{}{},
+	"Trailers":          struct{}{},
+	"Transfer-Encoding": struct{}{},
+	"Upgrade":           struct{}{},
 }
 
 type ProxyStatus struct {
@@ -114,16 +114,14 @@ func (proxy *Proxy) copyRequest(originalRequest *http.Request) *http.Request {
 	proxyRequest.URL.Scheme = "http"
 	proxyRequest.URL.Path = originalRequest.URL.Path
 
-	// Copy all header fields.
+	// Copy all header fields except ignoredHeaderNames'.
 	for key, values := range originalRequest.Header {
+		if _, ok := ignoredHeaderNames[key]; ok {
+			continue
+		}
 		for _, value := range values {
 			proxyRequest.Header.Add(key, value)
 		}
-	}
-
-	// Remove ignored header fields.
-	for _, headerName := range ignoredHeaderNames {
-		proxyRequest.Header.Del(headerName)
 	}
 
 	// Append this machine's host name into X-Forwarded-For.
