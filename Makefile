@@ -1,4 +1,4 @@
-VERSION=0.7.0
+VERSION=0.7.1
 LDFLAGS=-ldflags "-X main.Version=${VERSION}"
 TARGETS_NOVENDOR=$(shell glide novendor)
 
