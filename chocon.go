@@ -112,7 +112,12 @@ Compiler: %s %s
 			ps.Status = http.StatusBadRequest
 			return
 		}
-		host := strings.Split(r.Host, ":")[0]
+		hostPortSplit := strings.Split(r.Host, ":")
+		host := hostPortSplit[0]
+		port := ""
+		if len(hostPortSplit) > 1 {
+			port = ":" + hostPortSplit[1]
+		}
 		hostSplit := strings.Split(host, ".")
 		lastPartIndex := 0
 		for i, hostPart := range hostSplit {
@@ -125,7 +130,7 @@ Compiler: %s %s
 			return
 		}
 
-		pr.URL.Host = strings.Join(hostSplit[0:lastPartIndex], ".")
+		pr.URL.Host = strings.Join(hostSplit[0:lastPartIndex], ".") + port
 		pr.Host = pr.URL.Host
 		if hostSplit[lastPartIndex] == "ccnproxy-https" || hostSplit[lastPartIndex] == "ccnproxy-secure" || hostSplit[lastPartIndex] == "ccnproxy-ssl" {
 			pr.URL.Scheme = "https"
