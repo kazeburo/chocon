@@ -113,9 +113,9 @@ Compiler: %s %s
 			return
 		}
 		host := strings.Split(r.Host, ":")[0]
-		hostSplited := strings.Split(host, ".")
+		hostSplit := strings.Split(host, ".")
 		lastPartIndex := 0
-		for i, hostPart := range hostSplited {
+		for i, hostPart := range hostSplit {
 			if hostPart == "ccnproxy-ssl" || hostPart == "ccnproxy-secure" || hostPart == "ccnproxy-https" || hostPart == "ccnproxy" {
 				lastPartIndex = i
 			}
@@ -125,9 +125,9 @@ Compiler: %s %s
 			return
 		}
 
-		pr.URL.Host = strings.Join(hostSplited[0:lastPartIndex], ".")
+		pr.URL.Host = strings.Join(hostSplit[0:lastPartIndex], ".")
 		pr.Host = pr.URL.Host
-		if hostSplited[lastPartIndex] == "ccnproxy-https" || hostSplited[lastPartIndex] == "ccnproxy-secure" || hostSplited[lastPartIndex] == "ccnproxy-ssl" {
+		if hostSplit[lastPartIndex] == "ccnproxy-https" || hostSplit[lastPartIndex] == "ccnproxy-secure" || hostSplit[lastPartIndex] == "ccnproxy-ssl" {
 			pr.URL.Scheme = "https"
 		}
 	}
