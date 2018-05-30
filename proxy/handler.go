@@ -36,13 +36,15 @@ type ProxyStatus struct {
 type Proxy struct {
 	RequestConverter func(originalRequest, proxyRequest *http.Request, proxyStatus *ProxyStatus)
 	Transport        http.RoundTripper
+	upstreamURL      url.URL
 }
 
 // Create a request-based reverse-proxy.
-func NewProxyWithRequestConverter(requestConverter func(*http.Request, *http.Request, *ProxyStatus), transport *http.RoundTripper) *Proxy {
+func NewProxyWithRequestConverter(requestConverter func(*http.Request, *http.Request, *ProxyStatus), transport *http.RoundTripper, upstreamURL *url.URL) *Proxy {
 	return &Proxy{
 		RequestConverter: requestConverter,
 		Transport:        *transport,
+		upstreamURL:      *upstreamURL,
 	}
 }
 
@@ -53,17 +55,22 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, originalRequest *http.
 		return
 	}
 
-	// Set Proxied
 	proxyID := shortuuid.New()
-	originalRequest.Header.Set(ProxyHeaderName, proxyID)
 
 	// Create a new proxy request object by coping the original request.
 	proxyRequest := proxy.copyRequest(originalRequest)
 	proxyStatus := &ProxyStatus{Status: http.StatusOK}
 
-	// Convert an original request into another proxy request.
-	proxy.RequestConverter(originalRequest, proxyRequest, proxyStatus)
-
+	if proxy.upstreamURL.Scheme == "" {
+		// Set Proxied
+		originalRequest.Header.Set(ProxyHeaderName, proxyID)
+		// Convert an original request into another proxy request.
+		proxy.RequestConverter(originalRequest, proxyRequest, proxyStatus)
+	} else {
+		proxyRequest.URL.Scheme = proxy.upstreamURL.Scheme
+		proxyRequest.URL.Host = proxy.upstreamURL.Host
+		proxyRequest.Host = originalRequest.Host
+	}
 	if proxyStatus.Status != http.StatusOK {
 		writer.WriteHeader(proxyStatus.Status)
 		return

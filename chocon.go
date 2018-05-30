@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"runtime"
 	"strings"
@@ -31,6 +32,7 @@ type cmdOpts struct {
 	ReadTimeout      int    `long:"read-timeout" default:"30" description:"timeout of reading request"`
 	WriteTimeout     int    `long:"write-timeout" default:"90" description:"timeout of writing response"`
 	ProxyReadTimeout int    `long:"proxy-read-timeout" default:"60" description:"timeout of reading response from upstream"`
+	Upstream         string `long:"upstream" default:"" description:"upstream server"`
 }
 
 func addStatsHandler(h http.Handler) http.Handler {
@@ -104,7 +106,14 @@ Compiler: %s %s
 			runtime.Compiler,
 			runtime.Version())
 		return
+	}
 
+	upstreamURL := new(url.URL)
+	if opts.Upstream != "" {
+		upstreamURL, err = url.Parse(opts.Upstream)
+		if err != nil {
+			panic(fmt.Sprintf("upsteam url is invalid: %v", err))
+		}
 	}
 
 	requestConverter := func(r *http.Request, pr *http.Request, ps *proxy.ProxyStatus) {
@@ -152,7 +161,7 @@ Compiler: %s %s
 		ResponseHeaderTimeout: time.Duration(opts.ProxyReadTimeout) * time.Second,
 	}
 
-	proxyHandler := addStatsHandler(proxy.NewProxyWithRequestConverter(requestConverter, &transport))
+	proxyHandler := addStatsHandler(proxy.NewProxyWithRequestConverter(requestConverter, &transport, upstreamURL))
 
 	l, err := ss.NewListener()
 	if l == nil || err != nil {
