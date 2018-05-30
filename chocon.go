@@ -32,7 +32,7 @@ type cmdOpts struct {
 	ReadTimeout      int    `long:"read-timeout" default:"30" description:"timeout of reading request"`
 	WriteTimeout     int    `long:"write-timeout" default:"90" description:"timeout of writing response"`
 	ProxyReadTimeout int    `long:"proxy-read-timeout" default:"60" description:"timeout of reading response from upstream"`
-	Upstream         string `long:"upstream" default:"" description:"upstream server"`
+	Upstream         string `long:"upstream" default:"" description:"upstream server: http://upstream-server/"`
 }
 
 func addStatsHandler(h http.Handler) http.Handler {
@@ -113,6 +113,12 @@ Compiler: %s %s
 		upstreamURL, err = url.Parse(opts.Upstream)
 		if err != nil {
 			panic(fmt.Sprintf("upsteam url is invalid: %v", err))
+		}
+		if upstreamURL.Scheme != "http" && upstreamURL.Scheme != "https" {
+			panic(fmt.Sprintf("upsteam url is invalid: %s", "upsteam url scheme should be http or https"))
+		}
+		if upstreamURL.Host == "" {
+			panic(fmt.Sprintf("upsteam url is invalid: %s", "no hostname"))
 		}
 	}
 
