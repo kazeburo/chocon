@@ -1,16 +1,11 @@
 VERSION=0.7.1
 LDFLAGS=-ldflags "-X main.Version=${VERSION}"
-TARGETS_NOVENDOR=$(shell glide novendor)
+TARGETS_NOVENDOR="./..."
+GO111MODULE=on
 
 all: chocon
 
 .PHONY: chocon
-
-glide:
-	go get -u github.com/Masterminds/glide
-
-bundle:
-	glide install
 
 chocon: chocon.go
 	go build $(LDFLAGS) chocon.go
