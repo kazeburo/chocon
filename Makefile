@@ -1,4 +1,4 @@
-VERSION=0.7.1
+VERSION=0.8.0
 LDFLAGS=-ldflags "-X main.Version=${VERSION}"
 TARGETS_NOVENDOR=$(shell glide novendor)
 
@@ -34,5 +34,3 @@ tag:
 	git tag v${VERSION}
 	git push origin v${VERSION}
 	git push origin master
-
-
