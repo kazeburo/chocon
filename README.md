@@ -43,6 +43,7 @@ Application Options:
 --write-timeout=      timeout of writing response (default: 90)
 --proxy-read-timeout= timeout of reading response from upstream (default: 60)
 --upstream=           upstream server like http://upstream-server/ (default: none)
+--upstream-h2c        use h2c for upstream
 
 Help Options:
 -h, --help                Show this help message

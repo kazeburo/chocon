@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
@@ -10,12 +11,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fukata/golang-stats-api-handler"
-	"github.com/jessevdk/go-flags"
+	stats_api "github.com/fukata/golang-stats-api-handler"
+	flags "github.com/jessevdk/go-flags"
 	"github.com/kazeburo/chocon/proxy"
-	"github.com/lestrrat/go-apache-logformat"
-	"github.com/lestrrat/go-file-rotatelogs"
-	"github.com/lestrrat/go-server-starter-listener"
+	apachelog "github.com/lestrrat/go-apache-logformat"
+	rotatelogs "github.com/lestrrat/go-file-rotatelogs"
+	ss "github.com/lestrrat/go-server-starter-listener"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 )
 
 var (
@@ -33,6 +36,15 @@ type cmdOpts struct {
 	WriteTimeout     int    `long:"write-timeout" default:"90" description:"timeout of writing response"`
 	ProxyReadTimeout int    `long:"proxy-read-timeout" default:"60" description:"timeout of reading response from upstream"`
 	Upstream         string `long:"upstream" default:"" description:"upstream server: http://upstream-server/"`
+	UpstreamH2C      bool   `long:"upstream-h2c" description:"use h2c for upstream"`
+}
+
+type upstreamRoundTripper struct {
+	rt http.RoundTripper
+}
+
+func (upstr *upstreamRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	return upstr.rt.RoundTrip(req)
 }
 
 func addStatsHandler(h http.Handler) http.Handler {
@@ -47,21 +59,23 @@ func addStatsHandler(h http.Handler) http.Handler {
 
 func addLogHandler(h http.Handler, logDir string, logRotate int64) http.Server {
 	apacheLog, err := apachelog.New(`%h %l %u %t "%r" %>s %b "%v" %T.%{msec_frac}t %{X-Chocon-Req}i`)
+	h2s := &http2.Server{}
+
 	if err != nil {
 		panic(fmt.Sprintf("could not create logger: %v", err))
 	}
 
 	if logDir == "stdout" {
 		return http.Server{
-			Handler: apacheLog.Wrap(h, os.Stdout),
+			Handler: h2c.NewHandler(apacheLog.Wrap(h, os.Stdout), h2s),
 		}
 	} else if logDir == "" {
 		return http.Server{
-			Handler: apacheLog.Wrap(h, os.Stderr),
+			Handler: h2c.NewHandler(apacheLog.Wrap(h, os.Stderr), h2s),
 		}
 	} else if logDir == "none" {
 		return http.Server{
-			Handler: h,
+			Handler: h2c.NewHandler(h, h2s),
 		}
 	}
 
@@ -84,9 +98,8 @@ func addLogHandler(h http.Handler, logDir string, logRotate int64) http.Server {
 	if err != nil {
 		panic(fmt.Sprintf("rotatelogs.New failed: %v", err))
 	}
-
 	return http.Server{
-		Handler: apacheLog.Wrap(h, rl),
+		Handler: h2c.NewHandler(apacheLog.Wrap(h, rl), h2s),
 	}
 }
 
@@ -152,19 +165,33 @@ Compiler: %s %s
 		}
 	}
 
-	var transport http.RoundTripper = &http.Transport{
-		// inherited http.DefaultTransport
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}).DialContext,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-		// self-customized values
-		MaxIdleConnsPerHost:   opts.KeepaliveConns,
-		ResponseHeaderTimeout: time.Duration(opts.ProxyReadTimeout) * time.Second,
+	var transport http.RoundTripper
+	if upstreamURL.Scheme != "" && opts.UpstreamH2C {
+		transport = &upstreamRoundTripper{
+			rt: &http2.Transport{
+				AllowHTTP: true,
+				DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
+					return net.Dial(network, addr)
+				},
+			},
+		}
+	} else {
+		transport = &upstreamRoundTripper{
+			rt: &http.Transport{
+				// inherited http.DefaultTransport
+				Proxy: http.ProxyFromEnvironment,
+				DialContext: (&net.Dialer{
+					Timeout:   30 * time.Second,
+					KeepAlive: 30 * time.Second,
+				}).DialContext,
+				IdleConnTimeout:       90 * time.Second,
+				TLSHandshakeTimeout:   10 * time.Second,
+				ExpectContinueTimeout: 1 * time.Second,
+				// self-customized values
+				MaxIdleConnsPerHost:   opts.KeepaliveConns,
+				ResponseHeaderTimeout: time.Duration(opts.ProxyReadTimeout) * time.Second,
+			},
+		}
 	}
 
 	proxyHandler := addStatsHandler(proxy.NewProxyWithRequestConverter(requestConverter, &transport, upstreamURL))

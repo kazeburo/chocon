@@ -22,10 +22,10 @@ var ignoredHeaderNames = map[string]struct{}{
 	"Keep-Alive":          struct{}{},
 	"Proxy-Authenticate":  struct{}{},
 	"Proxy-Authorization": struct{}{},
-	"Te":                struct{}{},
-	"Trailers":          struct{}{},
-	"Transfer-Encoding": struct{}{},
-	"Upgrade":           struct{}{},
+	"Te":                  struct{}{},
+	"Trailers":            struct{}{},
+	"Transfer-Encoding":   struct{}{},
+	"Upgrade":             struct{}{},
 }
 
 type ProxyStatus struct {
@@ -54,7 +54,6 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, originalRequest *http.
 		writer.WriteHeader(http.StatusLoopDetected)
 		return
 	}
-
 	proxyID := shortuuid.New()
 
 	// Create a new proxy request object by coping the original request.
