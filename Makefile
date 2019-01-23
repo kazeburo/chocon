@@ -6,11 +6,11 @@ all: chocon
 
 .PHONY: chocon
 
-glide:
-	go get -u github.com/Masterminds/glide
-
 bundle:
-	glide install
+	dep ensure
+
+update:
+	dep ensure -update
 
 chocon: chocon.go
 	go build $(LDFLAGS) chocon.go

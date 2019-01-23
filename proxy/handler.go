@@ -5,6 +5,7 @@ package proxy
 import (
 	"io"
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -28,22 +29,23 @@ var ignoredHeaderNames = map[string]struct{}{
 	"Upgrade":             struct{}{},
 }
 
+// ProxyStatus proxy status
 type ProxyStatus struct {
 	Status int
 }
 
-// Provide host-based proxy server.
+// Proxy Provide host-based proxy server.
 type Proxy struct {
 	RequestConverter func(originalRequest, proxyRequest *http.Request, proxyStatus *ProxyStatus)
-	Transport        http.RoundTripper
+	Transports       []http.RoundTripper
 	upstreamURL      url.URL
 }
 
-// Create a request-based reverse-proxy.
-func NewProxyWithRequestConverter(requestConverter func(*http.Request, *http.Request, *ProxyStatus), transport *http.RoundTripper, upstreamURL *url.URL) *Proxy {
+// NewProxyWithRequestConverter Create a request-based reverse-proxy.
+func NewProxyWithRequestConverter(requestConverter func(*http.Request, *http.Request, *ProxyStatus), transports []http.RoundTripper, upstreamURL *url.URL) *Proxy {
 	return &Proxy{
 		RequestConverter: requestConverter,
-		Transport:        *transport,
+		Transports:       transports,
 		upstreamURL:      *upstreamURL,
 	}
 }
@@ -76,7 +78,7 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, originalRequest *http.
 	}
 
 	// Convert a request into a response by using its Transport.
-	response, err := proxy.Transport.RoundTrip(proxyRequest)
+	response, err := proxy.Transports[rand.Intn(len(proxy.Transports))].RoundTrip(proxyRequest)
 	if err != nil {
 		log.Printf("ErrorFromProxy: %v", err)
 		if err, ok := err.(net.Error); ok && err.Timeout() {

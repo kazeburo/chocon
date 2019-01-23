@@ -165,18 +165,22 @@ Compiler: %s %s
 		}
 	}
 
-	var transport http.RoundTripper
+	var transports []http.RoundTripper
 	if upstreamURL.Scheme != "" && opts.UpstreamH2C {
-		transport = &upstreamRoundTripper{
-			rt: &http2.Transport{
-				AllowHTTP: true,
-				DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
-					return net.Dial(network, addr)
+		c := 10
+		for c > 0 {
+			transports = append(transports, &upstreamRoundTripper{
+				rt: &http2.Transport{
+					AllowHTTP: true,
+					DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
+						return net.Dial(network, addr)
+					},
 				},
-			},
+			})
+			c--
 		}
 	} else {
-		transport = &upstreamRoundTripper{
+		transports = append(transports, &upstreamRoundTripper{
 			rt: &http.Transport{
 				// inherited http.DefaultTransport
 				Proxy: http.ProxyFromEnvironment,
@@ -191,10 +195,10 @@ Compiler: %s %s
 				MaxIdleConnsPerHost:   opts.KeepaliveConns,
 				ResponseHeaderTimeout: time.Duration(opts.ProxyReadTimeout) * time.Second,
 			},
-		}
+		})
 	}
 
-	proxyHandler := addStatsHandler(proxy.NewProxyWithRequestConverter(requestConverter, &transport, upstreamURL))
+	proxyHandler := addStatsHandler(proxy.NewProxyWithRequestConverter(requestConverter, transports, upstreamURL))
 
 	l, err := ss.NewListener()
 	if l == nil || err != nil {
