@@ -102,6 +102,14 @@
   version = "v1.3.0"
 
 [[projects]]
+  digest = "1:4086cfa4effbd662f2e73a9be4ca3b80d15ce65b73a4f70cfe42d2d80c483a77"
+  name = "go.mercari.io/go-dnscache"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "9c60ba2751201bcc1079a467f46464936a0ef172"
+  version = "0.1.0"
+
+[[projects]]
   digest = "1:3c1a69cdae3501bf75e76d0d86dc6f2b0a7421bc205c0cb7b96b19eed464a34d"
   name = "go.uber.org/atomic"
   packages = ["."]
@@ -143,6 +151,7 @@
     "github.com/lestrrat/go-server-starter-listener",
     "github.com/renstrom/shortuuid",
     "github.com/stretchr/testify/assert",
+    "go.mercari.io/go-dnscache",
     "go.uber.org/zap",
   ]
   solver-name = "gps-cdcl"

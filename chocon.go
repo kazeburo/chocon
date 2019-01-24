@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"runtime"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"github.com/fukata/golang-stats-api-handler"
 	"github.com/jessevdk/go-flags"
 	"github.com/kazeburo/chocon/proxy"
+	"github.com/kazeburo/chocon/upstream"
 	"github.com/lestrrat/go-apache-logformat"
 	"github.com/lestrrat/go-file-rotatelogs"
 	"github.com/lestrrat/go-server-starter-listener"
@@ -48,7 +48,7 @@ func addStatsHandler(h http.Handler) http.Handler {
 }
 
 func addLogHandler(h http.Handler, logDir string, logRotate int64, logger *zap.Logger) http.Handler {
-	apacheLog, err := apachelog.New(`%h %l %u %t "%r" %>s %b "%v" %T.%{msec_frac}t %{X-Chocon-Req}i`)
+	apacheLog, err := apachelog.New(`%h %l %u %t "%r" %>s %b "%v" %D %{X-Chocon-Req}i`)
 	if err != nil {
 		logger.Fatal("could not create apache logger", zap.Error(err))
 	}
@@ -121,22 +121,10 @@ Compiler: %s %s
 
 	logger, _ := zap.NewProduction()
 
-	upstreamURL := new(url.URL)
-	if opts.Upstream != "" {
-		upstreamURL, err = url.Parse(opts.Upstream)
-		if err != nil {
-			logger.Fatal("upsteam url is invalid", zap.Error(err))
-		}
-		if upstreamURL.Scheme != "http" && upstreamURL.Scheme != "https" {
-			logger.Fatal("upsteam url is invalid: upsteam url scheme should be http or https")
-		}
-		if upstreamURL.Host == "" {
-			logger.Fatal("upsteam url is invalid: no hostname")
-		}
-	}
+	upstream := upstream.New(opts.Upstream, logger)
 
 	transport := makeTransport(opts.KeepaliveConns, opts.ProxyReadTimeout)
-	var handler http.Handler = proxy.New(&transport, upstreamURL, logger)
+	var handler http.Handler = proxy.New(&transport, upstream, logger)
 
 	handler = addStatsHandler(handler)
 	handler = addLogHandler(handler, opts.LogDir, opts.LogRotate, logger)

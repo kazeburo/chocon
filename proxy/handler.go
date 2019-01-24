@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/kazeburo/chocon/upstream"
 	"github.com/renstrom/shortuuid"
 	"go.uber.org/zap"
 )
@@ -36,17 +37,17 @@ type Status struct {
 
 // Proxy : Provide host-based proxy server.
 type Proxy struct {
-	Transport   http.RoundTripper
-	upstreamURL url.URL
-	logger      *zap.Logger
+	Transport http.RoundTripper
+	upstream  *upstream.Upstream
+	logger    *zap.Logger
 }
 
 // New :  Create a request-based reverse-proxy.
-func New(transport *http.RoundTripper, upstreamURL *url.URL, logger *zap.Logger) *Proxy {
+func New(transport *http.RoundTripper, upstream *upstream.Upstream, logger *zap.Logger) *Proxy {
 	return &Proxy{
-		Transport:   *transport,
-		upstreamURL: *upstreamURL,
-		logger:      logger,
+		Transport: *transport,
+		upstream:  upstream,
+		logger:    logger,
 	}
 }
 
@@ -63,15 +64,19 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, originalRequest *http.
 	proxyRequest := proxy.copyRequest(originalRequest)
 	status := &Status{Code: http.StatusOK}
 
-	if proxy.upstreamURL.Scheme == "" {
+	if proxy.upstream.Enabled() {
+		h, err := proxy.upstream.GetHost(originalRequest.Context())
+		if err != nil {
+			status.Code = http.StatusBadGateway
+		}
+		proxyRequest.URL.Scheme = proxy.upstream.GetScheme()
+		proxyRequest.URL.Host = h
+		proxyRequest.Host = originalRequest.Host
+	} else {
 		// Set Proxied
 		originalRequest.Header.Set(proxyHeaderName, proxyID)
 		// Convert an original request into another proxy request.
 		proxy.rewriteProxyHost(originalRequest, proxyRequest, status)
-	} else {
-		proxyRequest.URL.Scheme = proxy.upstreamURL.Scheme
-		proxyRequest.URL.Host = proxy.upstreamURL.Host
-		proxyRequest.Host = originalRequest.Host
 	}
 	if status.Code != http.StatusOK {
 		writer.WriteHeader(status.Code)
