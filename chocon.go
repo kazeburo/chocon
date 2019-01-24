@@ -39,7 +39,7 @@ type cmdOpts struct {
 	ProxyReadTimeout int    `long:"proxy-read-timeout" default:"60" description:"timeout of reading response from upstream"`
 	Upstream         string `long:"upstream" default:"" description:"upstream server: http://upstream-server/"`
 	StatsBufsize     int    `long:"stsize" default:"1000" description:"buffer size for http stats"`
-	StatsSpfactor    int    `long:"spfactor" default:"1" description:"sampling factor for http stats"`
+	StatsSpfactor    int    `long:"spfactor" default:"3" description:"sampling factor for http stats"`
 }
 
 func addStatsHandler(h http.Handler, mw *statsHTTP.Metrics) http.Handler {
