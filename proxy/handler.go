@@ -4,12 +4,12 @@ package proxy
 
 import (
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
 
 	"github.com/renstrom/shortuuid"
+	"go.uber.org/zap"
 )
 
 const (
@@ -22,29 +22,32 @@ var ignoredHeaderNames = map[string]struct{}{
 	"Keep-Alive":          struct{}{},
 	"Proxy-Authenticate":  struct{}{},
 	"Proxy-Authorization": struct{}{},
-	"Te":                struct{}{},
-	"Trailers":          struct{}{},
-	"Transfer-Encoding": struct{}{},
-	"Upgrade":           struct{}{},
+	"Te":                  struct{}{},
+	"Trailers":            struct{}{},
+	"Transfer-Encoding":   struct{}{},
+	"Upgrade":             struct{}{},
 }
 
-type ProxyStatus struct {
-	Status int
+// Status for override http status
+type Status struct {
+	Code int
 }
 
-// Provide host-based proxy server.
+// Proxy : Provide host-based proxy server.
 type Proxy struct {
-	RequestConverter func(originalRequest, proxyRequest *http.Request, proxyStatus *ProxyStatus)
+	RequestConverter func(originalRequest, proxyRequest *http.Request, status *Status)
 	Transport        http.RoundTripper
 	upstreamURL      url.URL
+	logger           *zap.Logger
 }
 
-// Create a request-based reverse-proxy.
-func NewProxyWithRequestConverter(requestConverter func(*http.Request, *http.Request, *ProxyStatus), transport *http.RoundTripper, upstreamURL *url.URL) *Proxy {
+// NewProxyWithRequestConverter :  Create a request-based reverse-proxy.
+func NewProxyWithRequestConverter(requestConverter func(*http.Request, *http.Request, *Status), transport *http.RoundTripper, upstreamURL *url.URL, logger *zap.Logger) *Proxy {
 	return &Proxy{
 		RequestConverter: requestConverter,
 		Transport:        *transport,
 		upstreamURL:      *upstreamURL,
+		logger:           logger,
 	}
 }
 
@@ -59,27 +62,27 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, originalRequest *http.
 
 	// Create a new proxy request object by coping the original request.
 	proxyRequest := proxy.copyRequest(originalRequest)
-	proxyStatus := &ProxyStatus{Status: http.StatusOK}
+	status := &Status{Code: http.StatusOK}
 
 	if proxy.upstreamURL.Scheme == "" {
 		// Set Proxied
 		originalRequest.Header.Set(ProxyHeaderName, proxyID)
 		// Convert an original request into another proxy request.
-		proxy.RequestConverter(originalRequest, proxyRequest, proxyStatus)
+		proxy.RequestConverter(originalRequest, proxyRequest, status)
 	} else {
 		proxyRequest.URL.Scheme = proxy.upstreamURL.Scheme
 		proxyRequest.URL.Host = proxy.upstreamURL.Host
 		proxyRequest.Host = originalRequest.Host
 	}
-	if proxyStatus.Status != http.StatusOK {
-		writer.WriteHeader(proxyStatus.Status)
+	if status.Code != http.StatusOK {
+		writer.WriteHeader(status.Code)
 		return
 	}
 
 	// Convert a request into a response by using its Transport.
 	response, err := proxy.Transport.RoundTrip(proxyRequest)
 	if err != nil {
-		log.Printf("ErrorFromProxy: %v", err)
+		proxy.logger.Error("ErrorFromProxy", zap.Error(err))
 		if err, ok := err.(net.Error); ok && err.Timeout() {
 			writer.WriteHeader(http.StatusGatewayTimeout)
 		} else {

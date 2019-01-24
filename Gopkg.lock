@@ -2,11 +2,12 @@
 
 
 [[projects]]
-  digest = "1:511f7e1ca840c3b8c5761870d8606aa8bdf95f5d422a74fbe0ef3cf210cfe2c9"
+  digest = "1:ffe9824d294da03b391f44e1ae8281281b4afc1bdaa9588c9097785e3af10cec"
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
   pruneopts = "UT"
-  revision = "04cdfd42973bb9c8589fd6a731800cf222fde1a9"
+  revision = "8991bc29aa16c548c550c7ff78260e27b9ab7c73"
+  version = "v1.1.1"
 
 [[projects]]
   branch = "master"
@@ -17,25 +18,40 @@
   revision = "ab9f90f16caab828afda479fd34bfbbbba2efcee"
 
 [[projects]]
-  digest = "1:bedcc29d570d02d8cc999d8d6ef6bd860ec10154e67d2821d87eeb5202243897"
+  digest = "1:236d7e1bdb50d8f68559af37dbcf9d142d56b431c9b2176d41e2a009b664cda8"
+  name = "github.com/google/uuid"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "9b3b1e0f5f99ae461456d768e7d301a7acdaa2d8"
+  version = "v1.1.0"
+
+[[projects]]
+  digest = "1:a2cff208d4759f6ba1b1cd228587b0a1869f95f22542ec9cd17fff64430113c7"
   name = "github.com/jessevdk/go-flags"
   packages = ["."]
   pruneopts = "UT"
-  revision = "4e64e4a4e2552194cf594243e23aa9baf3b4297e"
+  revision = "c6ca198ec95c841fdb89fc0de7496fed11ab854e"
+  version = "v1.4.0"
 
 [[projects]]
-  digest = "1:e17de730673ab51b1b95a389cc7a6c2c062ee608df5af7ccd839bf825d289841"
+  digest = "1:5195e12a2bd45c864c6585d1ee282f98d1f4c18dde8c4baffb07fa6332f2b07f"
   name = "github.com/lestrrat/go-apache-logformat"
-  packages = ["."]
+  packages = [
+    ".",
+    "internal/httputil",
+    "internal/logctx",
+  ]
   pruneopts = "UT"
-  revision = "aef9f5955f335dc2fbb969c95b849347b15e36c9"
+  revision = "96240283407bfb047030069e9e56c4be4ccc205c"
+  version = "v2.0.1"
 
 [[projects]]
-  digest = "1:fdf079fec49f845540f7ab95e15686fb655b1606b5136ed36aaafaa25d7d4119"
+  branch = "master"
+  digest = "1:f7d8e8432e355163397d2da1e17d0fb616d611db1360c43b1ac73e56f87038e2"
   name = "github.com/lestrrat/go-file-rotatelogs"
   packages = ["."]
   pruneopts = "UT"
-  revision = "505c036604b3326a96097ca91865df30043093a5"
+  revision = "d3151e2a480fdcd05fb97102f5310a47d96274c4"
 
 [[projects]]
   branch = "master"
@@ -46,46 +62,75 @@
   revision = "00dd68592c85334ce94a28199ec7961352c0ba6d"
 
 [[projects]]
-  digest = "1:2e1cd8aa73edba5e166309bf28c19e0ff57fc3f063c7e39b60e3f2a67bbd9fa1"
+  branch = "master"
+  digest = "1:b9f2e1d7b042e6fdb2aa1e3762afdb99e0c584f66a1a346b03cf8b4be203c694"
   name = "github.com/lestrrat/go-strftime"
   packages = ["."]
   pruneopts = "UT"
-  revision = "04ef93e285313c8978cbc7cad26d2aa7a9927451"
+  revision = "ba3bf9c1d0421aa146564a632931730344f1f9f1"
 
 [[projects]]
-  digest = "1:5c77ec0df6475d5fc9bc636ebd00a2585310c4e44c8a30c83f0f5f0c4b53d717"
+  digest = "1:cf31692c14422fa27c83a05292eb5cbe0fb2775972e8f1f8446a71549bd8980b"
   name = "github.com/pkg/errors"
   packages = ["."]
   pruneopts = "UT"
-  revision = "248dadf4e9068a0b3e79f02ed0a610d935de5302"
+  revision = "ba968bfe8b2f7e042a574c888954fccecfa385b4"
+  version = "v0.8.1"
 
 [[projects]]
-  digest = "1:08413c4235cad94a96c39e1e2f697789733c4a87d1fdf06b412d2cf2ba49826a"
+  digest = "1:0028cb19b2e4c3112225cd871870f2d9cf49b9b4276531f03438a88e94be86fe"
   name = "github.com/pmezard/go-difflib"
   packages = ["difflib"]
   pruneopts = "UT"
-  revision = "d8ed2627bdf02c080bf22230dbb337003b7aba2d"
+  revision = "792786c7400a136282c1664665ae0a8db921c6c2"
+  version = "v1.0.0"
 
 [[projects]]
-  digest = "1:66ed4f9a84609674456bf5eb17d4d7b0fcbb91b62fc4e46daa7a69a2b949c3c3"
+  digest = "1:2ee572ec2cbbeb51d6b77067c2dd60e419528c5ba0174ae6166bbe91cdd2e2a5"
   name = "github.com/renstrom/shortuuid"
   packages = ["."]
   pruneopts = "UT"
-  revision = "d728e00b727de969356736fabe7c6f405347a26c"
+  revision = "f84ba35fc5c62164a92d7eb989c87fba14bf423d"
+  version = "v3.0.1"
 
 [[projects]]
-  digest = "1:34bf609f0bc576cd648a993bd711fb9b25f13dcd4ec1d1f5b4137b9d3ed0ff2f"
-  name = "github.com/satori/go.uuid"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "b061729afc07e77a8aa4fad0a2fd840958f1942a"
-
-[[projects]]
-  digest = "1:8fea75655edc301b238cc7e8bfbc3a09b6fbc2f4ac353ce3ecf29449d407e5f1"
+  digest = "1:972c2427413d41a1e06ca4897e8528e5a1622894050e2f527b38ddf0f343f759"
   name = "github.com/stretchr/testify"
   packages = ["assert"]
   pruneopts = "UT"
-  revision = "f6abca593680b2315d2075e0f5e2a9751e3f431a"
+  revision = "ffdc059bfe9ce6a4e144ba849dbedead332c6053"
+  version = "v1.3.0"
+
+[[projects]]
+  digest = "1:3c1a69cdae3501bf75e76d0d86dc6f2b0a7421bc205c0cb7b96b19eed464a34d"
+  name = "go.uber.org/atomic"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "1ea20fb1cbb1cc08cbd0d913a96dead89aa18289"
+  version = "v1.3.2"
+
+[[projects]]
+  digest = "1:60bf2a5e347af463c42ed31a493d817f8a72f102543060ed992754e689805d1a"
+  name = "go.uber.org/multierr"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "3c4937480c32f4c13a875a1829af76c98ca3d40a"
+  version = "v1.1.0"
+
+[[projects]]
+  digest = "1:c52caf7bd44f92e54627a31b85baf06a68333a196b3d8d241480a774733dcf8b"
+  name = "go.uber.org/zap"
+  packages = [
+    ".",
+    "buffer",
+    "internal/bufferpool",
+    "internal/color",
+    "internal/exit",
+    "zapcore",
+  ]
+  pruneopts = "UT"
+  revision = "ff33455a0e382e8a81d14dd7c922020b6b5e7982"
+  version = "v1.9.1"
 
 [solve-meta]
   analyzer-name = "dep"
@@ -98,6 +143,7 @@
     "github.com/lestrrat/go-server-starter-listener",
     "github.com/renstrom/shortuuid",
     "github.com/stretchr/testify/assert",
+    "go.uber.org/zap",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -16,9 +16,11 @@ import (
 	"github.com/lestrrat/go-apache-logformat"
 	"github.com/lestrrat/go-file-rotatelogs"
 	"github.com/lestrrat/go-server-starter-listener"
+	"go.uber.org/zap"
 )
 
 var (
+	// Version chocon version
 	Version string
 )
 
@@ -91,6 +93,8 @@ func addLogHandler(h http.Handler, logDir string, logRotate int64) http.Server {
 }
 
 func main() {
+	logger, _ := zap.NewProduction()
+
 	opts := cmdOpts{}
 	psr := flags.NewParser(&opts, flags.Default)
 	_, err := psr.Parse()
@@ -122,9 +126,9 @@ Compiler: %s %s
 		}
 	}
 
-	requestConverter := func(r *http.Request, pr *http.Request, ps *proxy.ProxyStatus) {
+	requestConverter := func(r *http.Request, pr *http.Request, ps *proxy.Status) {
 		if r.Host == "" {
-			ps.Status = http.StatusBadRequest
+			ps.Code = http.StatusBadRequest
 			return
 		}
 		hostPortSplit := strings.Split(r.Host, ":")
@@ -141,7 +145,7 @@ Compiler: %s %s
 			}
 		}
 		if lastPartIndex == 0 {
-			ps.Status = http.StatusBadRequest
+			ps.Code = http.StatusBadRequest
 			return
 		}
 
@@ -167,7 +171,7 @@ Compiler: %s %s
 		ResponseHeaderTimeout: time.Duration(opts.ProxyReadTimeout) * time.Second,
 	}
 
-	proxyHandler := addStatsHandler(proxy.NewProxyWithRequestConverter(requestConverter, &transport, upstreamURL))
+	proxyHandler := addStatsHandler(proxy.NewProxyWithRequestConverter(requestConverter, &transport, upstreamURL, logger))
 
 	l, err := ss.NewListener()
 	if l == nil || err != nil {
