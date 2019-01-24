@@ -92,7 +92,7 @@ func makeTransport(keepaliveConns int, proxyReadTimeout int) http.RoundTripper {
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
 		}).DialContext,
-		IdleConnTimeout:       90 * time.Second,
+		IdleConnTimeout:       30 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 		// self-customized values
