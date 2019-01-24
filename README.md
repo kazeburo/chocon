@@ -4,7 +4,7 @@
 
 # Requirements
 
-**chocon** requires Go1.7.3 or later.
+**chocon** requires Go1.11.3 or later.
 
 # Installation
 
