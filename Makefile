@@ -1,16 +1,15 @@
 VERSION=0.8.0
 LDFLAGS=-ldflags "-X main.Version=${VERSION}"
-TARGETS_NOVENDOR=$(shell glide novendor)
 
 all: chocon
 
 .PHONY: chocon
 
-glide:
-	go get -u github.com/Masterminds/glide
-
 bundle:
-	glide install
+	dep ensure
+
+update:
+	dep ensure -update
 
 chocon: chocon.go
 	go build $(LDFLAGS) chocon.go
@@ -19,10 +18,10 @@ linux: chocon.go
 	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) chocon.go
 
 check:
-	go test -v $(TARGETS_NOVENDOR)
+	go test ./...
 
 fmt:
-	@echo $(TARGETS_NOVENDOR) | xargs go fmt
+	go fmt ./...
 
 dist:
 	git archive --format tgz HEAD -o chocon-$(VERSION).tar.gz --prefix chocon-$(VERSION)/
