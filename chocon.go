@@ -120,7 +120,6 @@ Compiler: %s %s
 	}
 
 	logger, _ := zap.NewProduction()
-
 	upstream := upstream.New(opts.Upstream, logger)
 
 	transport := makeTransport(opts.KeepaliveConns, opts.ProxyReadTimeout)
