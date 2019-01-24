@@ -7,13 +7,14 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/renstrom/shortuuid"
 	"go.uber.org/zap"
 )
 
 const (
-	ProxyHeaderName = "X-Chocon-Req"
+	proxyHeaderName = "X-Chocon-Req"
 )
 
 // These headers won't be copied from original request to proxy request.
@@ -35,25 +36,23 @@ type Status struct {
 
 // Proxy : Provide host-based proxy server.
 type Proxy struct {
-	RequestConverter func(originalRequest, proxyRequest *http.Request, status *Status)
-	Transport        http.RoundTripper
-	upstreamURL      url.URL
-	logger           *zap.Logger
+	Transport   http.RoundTripper
+	upstreamURL url.URL
+	logger      *zap.Logger
 }
 
-// NewProxyWithRequestConverter :  Create a request-based reverse-proxy.
-func NewProxyWithRequestConverter(requestConverter func(*http.Request, *http.Request, *Status), transport *http.RoundTripper, upstreamURL *url.URL, logger *zap.Logger) *Proxy {
+// New :  Create a request-based reverse-proxy.
+func New(transport *http.RoundTripper, upstreamURL *url.URL, logger *zap.Logger) *Proxy {
 	return &Proxy{
-		RequestConverter: requestConverter,
-		Transport:        *transport,
-		upstreamURL:      *upstreamURL,
-		logger:           logger,
+		Transport:   *transport,
+		upstreamURL: *upstreamURL,
+		logger:      logger,
 	}
 }
 
 func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, originalRequest *http.Request) {
 	// If request has Via: ViaHeader, stop request
-	if originalRequest.Header.Get(ProxyHeaderName) != "" {
+	if originalRequest.Header.Get(proxyHeaderName) != "" {
 		writer.WriteHeader(http.StatusLoopDetected)
 		return
 	}
@@ -66,9 +65,9 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, originalRequest *http.
 
 	if proxy.upstreamURL.Scheme == "" {
 		// Set Proxied
-		originalRequest.Header.Set(ProxyHeaderName, proxyID)
+		originalRequest.Header.Set(proxyHeaderName, proxyID)
 		// Convert an original request into another proxy request.
-		proxy.RequestConverter(originalRequest, proxyRequest, status)
+		proxy.rewriteProxyHost(originalRequest, proxyRequest, status)
 	} else {
 		proxyRequest.URL.Scheme = proxy.upstreamURL.Scheme
 		proxyRequest.URL.Host = proxy.upstreamURL.Host
@@ -100,13 +99,43 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, originalRequest *http.
 			writer.Header().Add(key, value)
 		}
 	}
-	writer.Header().Add(ProxyHeaderName, proxyID)
+	writer.Header().Add(proxyHeaderName, proxyID)
 
 	// Copy a status code.
 	writer.WriteHeader(response.StatusCode)
 
 	// Copy a response body.
 	io.Copy(writer, response.Body)
+}
+
+func (proxy *Proxy) rewriteProxyHost(r *http.Request, pr *http.Request, ps *Status) {
+	if r.Host == "" {
+		ps.Code = http.StatusBadRequest
+		return
+	}
+	hostPortSplit := strings.Split(r.Host, ":")
+	host := hostPortSplit[0]
+	port := ""
+	if len(hostPortSplit) > 1 {
+		port = ":" + hostPortSplit[1]
+	}
+	hostSplit := strings.Split(host, ".")
+	lastPartIndex := 0
+	for i, hostPart := range hostSplit {
+		if hostPart == "ccnproxy-ssl" || hostPart == "ccnproxy-secure" || hostPart == "ccnproxy-https" || hostPart == "ccnproxy" {
+			lastPartIndex = i
+		}
+	}
+	if lastPartIndex == 0 {
+		ps.Code = http.StatusBadRequest
+		return
+	}
+
+	pr.URL.Host = strings.Join(hostSplit[0:lastPartIndex], ".") + port
+	pr.Host = pr.URL.Host
+	if hostSplit[lastPartIndex] == "ccnproxy-https" || hostSplit[lastPartIndex] == "ccnproxy-secure" || hostSplit[lastPartIndex] == "ccnproxy-ssl" {
+		pr.URL.Scheme = "https"
+	}
 }
 
 // Create a new proxy request with some modifications from an original request.

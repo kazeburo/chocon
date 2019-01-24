@@ -47,24 +47,18 @@ func addStatsHandler(h http.Handler) http.Handler {
 	})
 }
 
-func addLogHandler(h http.Handler, logDir string, logRotate int64) http.Server {
+func addLogHandler(h http.Handler, logDir string, logRotate int64, logger *zap.Logger) http.Handler {
 	apacheLog, err := apachelog.New(`%h %l %u %t "%r" %>s %b "%v" %T.%{msec_frac}t %{X-Chocon-Req}i`)
 	if err != nil {
-		panic(fmt.Sprintf("could not create logger: %v", err))
+		logger.Fatal("could not create apache logger", zap.Error(err))
 	}
 
 	if logDir == "stdout" {
-		return http.Server{
-			Handler: apacheLog.Wrap(h, os.Stdout),
-		}
+		return apacheLog.Wrap(h, os.Stdout)
 	} else if logDir == "" {
-		return http.Server{
-			Handler: apacheLog.Wrap(h, os.Stderr),
-		}
+		return apacheLog.Wrap(h, os.Stderr)
 	} else if logDir == "none" {
-		return http.Server{
-			Handler: h,
-		}
+		return h
 	}
 
 	logFile := logDir
@@ -84,17 +78,30 @@ func addLogHandler(h http.Handler, logDir string, logRotate int64) http.Server {
 		rotatelogs.WithRotationTime(time.Second*86400),
 	)
 	if err != nil {
-		panic(fmt.Sprintf("rotatelogs.New failed: %v", err))
+		logger.Fatal("rotatelogs.New failed", zap.Error(err))
 	}
 
-	return http.Server{
-		Handler: apacheLog.Wrap(h, rl),
+	return apacheLog.Wrap(h, rl)
+}
+
+func makeTransport(keepaliveConns int, proxyReadTimeout int) http.RoundTripper {
+	return &http.Transport{
+		// inherited http.DefaultTransport
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		// self-customized values
+		MaxIdleConnsPerHost:   keepaliveConns,
+		ResponseHeaderTimeout: time.Duration(proxyReadTimeout) * time.Second,
 	}
 }
 
 func main() {
-	logger, _ := zap.NewProduction()
-
 	opts := cmdOpts{}
 	psr := flags.NewParser(&opts, flags.Default)
 	_, err := psr.Parse()
@@ -112,78 +119,44 @@ Compiler: %s %s
 		return
 	}
 
+	logger, _ := zap.NewProduction()
+
 	upstreamURL := new(url.URL)
 	if opts.Upstream != "" {
 		upstreamURL, err = url.Parse(opts.Upstream)
 		if err != nil {
-			panic(fmt.Sprintf("upsteam url is invalid: %v", err))
+			logger.Fatal("upsteam url is invalid", zap.Error(err))
 		}
 		if upstreamURL.Scheme != "http" && upstreamURL.Scheme != "https" {
-			panic(fmt.Sprintf("upsteam url is invalid: %s", "upsteam url scheme should be http or https"))
+			logger.Fatal("upsteam url is invalid: upsteam url scheme should be http or https")
 		}
 		if upstreamURL.Host == "" {
-			panic(fmt.Sprintf("upsteam url is invalid: %s", "no hostname"))
+			logger.Fatal("upsteam url is invalid: no hostname")
 		}
 	}
 
-	requestConverter := func(r *http.Request, pr *http.Request, ps *proxy.Status) {
-		if r.Host == "" {
-			ps.Code = http.StatusBadRequest
-			return
-		}
-		hostPortSplit := strings.Split(r.Host, ":")
-		host := hostPortSplit[0]
-		port := ""
-		if len(hostPortSplit) > 1 {
-			port = ":" + hostPortSplit[1]
-		}
-		hostSplit := strings.Split(host, ".")
-		lastPartIndex := 0
-		for i, hostPart := range hostSplit {
-			if hostPart == "ccnproxy-ssl" || hostPart == "ccnproxy-secure" || hostPart == "ccnproxy-https" || hostPart == "ccnproxy" {
-				lastPartIndex = i
-			}
-		}
-		if lastPartIndex == 0 {
-			ps.Code = http.StatusBadRequest
-			return
-		}
+	transport := makeTransport(opts.KeepaliveConns, opts.ProxyReadTimeout)
+	var handler http.Handler = proxy.New(&transport, upstreamURL, logger)
 
-		pr.URL.Host = strings.Join(hostSplit[0:lastPartIndex], ".") + port
-		pr.Host = pr.URL.Host
-		if hostSplit[lastPartIndex] == "ccnproxy-https" || hostSplit[lastPartIndex] == "ccnproxy-secure" || hostSplit[lastPartIndex] == "ccnproxy-ssl" {
-			pr.URL.Scheme = "https"
-		}
+	handler = addStatsHandler(handler)
+	handler = addLogHandler(handler, opts.LogDir, opts.LogRotate, logger)
+
+	server := http.Server{
+		Handler:      handler,
+		ReadTimeout:  time.Duration(opts.ReadTimeout) * time.Second,
+		WriteTimeout: time.Duration(opts.WriteTimeout) * time.Second,
 	}
-
-	var transport http.RoundTripper = &http.Transport{
-		// inherited http.DefaultTransport
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}).DialContext,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-		// self-customized values
-		MaxIdleConnsPerHost:   opts.KeepaliveConns,
-		ResponseHeaderTimeout: time.Duration(opts.ProxyReadTimeout) * time.Second,
-	}
-
-	proxyHandler := addStatsHandler(proxy.NewProxyWithRequestConverter(requestConverter, &transport, upstreamURL, logger))
 
 	l, err := ss.NewListener()
 	if l == nil || err != nil {
 		// Fallback if not running under Server::Starter
 		l, err = net.Listen("tcp", fmt.Sprintf("%s:%s", opts.Listen, opts.Port))
 		if err != nil {
-			panic(fmt.Sprintf("Failed to listen to port %s:%s", opts.Listen, opts.Port))
+			logger.Fatal("Failed to listen to port",
+				zap.Error(err),
+				zap.String("listen", opts.Listen),
+				zap.String("port", opts.Port))
 		}
 	}
-
-	server := addLogHandler(proxyHandler, opts.LogDir, opts.LogRotate)
-	server.ReadTimeout = time.Duration(opts.ReadTimeout) * time.Second
-	server.WriteTimeout = time.Duration(opts.WriteTimeout) * time.Second
 	server.Serve(l)
 }

@@ -17,9 +17,7 @@ var (
 )
 
 func init() {
-	dummyProxy = &Proxy{
-		RequestConverter: func(r *http.Request, pr *http.Request, ps *ProxyStatus) {},
-	}
+	dummyProxy = &Proxy{}
 	var err error
 	dummyRequest, err = createDummyRequest()
 	if err != nil {
@@ -36,10 +34,10 @@ func createDummyRequest() (*http.Request, error) {
 		"Keep-Alive":          {"timeout=30, max=100"},
 		"Proxy-Authenticate":  {"Basic"},
 		"Proxy-Authorization": {"Basic dummy"},
-		"Te":                {"deflate"},
-		"Trailers":          {"Expires"},
-		"Transfer-Encoding": {"chunked"},
-		"Upgrade":           {"WebSocket"},
+		"Te":                  {"deflate"},
+		"Trailers":            {"Expires"},
+		"Transfer-Encoding":   {"chunked"},
+		"Upgrade":             {"WebSocket"},
 	}
 	dummyURL = &url.URL{
 		Scheme: "http",
