@@ -46,15 +46,15 @@
   revision = "bb8451138cebab76e0759a2651b2685f56ad660a"
 
 [[projects]]
-  digest = "1:8f5579a88f14ca4029f38f7491f12f578e38d942d9343e63aaa68f14c31df053"
+  branch = "master"
+  digest = "1:14e8f959d8494ed29af82df87eab0f80ee3b85a972c23f82f6a63f19e809e9de"
   name = "github.com/lestrrat-go/file-rotatelogs"
   packages = [
     ".",
     "internal/option",
   ]
   pruneopts = "UT"
-  revision = "3b4f34a036f374c18d604e1b8006d9fbb9593c06"
-  version = "v2.2.0"
+  revision = "4ce522c92b91beadfd4c77f75dcc06ffe97cf9c6"
 
 [[projects]]
   branch = "master"
