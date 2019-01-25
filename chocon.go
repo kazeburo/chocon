@@ -118,6 +118,15 @@ func makeTransport(keepaliveConns int, proxyReadTimeout int) http.RoundTripper {
 	}
 }
 
+func printVersion() {
+	fmt.Printf(`chocon %s
+Compiler: %s %s
+`,
+		Version,
+		runtime.Compiler,
+		runtime.Version())
+}
+
 func main() {
 	opts := cmdOpts{}
 	psr := flags.NewParser(&opts, flags.Default)
@@ -127,12 +136,7 @@ func main() {
 	}
 
 	if opts.Version {
-		fmt.Printf(`chocon %s
-Compiler: %s %s
-`,
-			Version,
-			runtime.Compiler,
-			runtime.Version())
+		printVersion()
 		return
 	}
 
