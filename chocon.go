@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -16,6 +18,7 @@ import (
 	"github.com/lestrrat/go-apache-logformat"
 	"github.com/lestrrat/go-file-rotatelogs"
 	"github.com/lestrrat/go-server-starter-listener"
+	statsHTTP "go.mercari.io/go-httpstats"
 	"go.uber.org/zap"
 )
 
@@ -35,19 +38,29 @@ type cmdOpts struct {
 	WriteTimeout     int    `long:"write-timeout" default:"90" description:"timeout of writing response"`
 	ProxyReadTimeout int    `long:"proxy-read-timeout" default:"60" description:"timeout of reading response from upstream"`
 	Upstream         string `long:"upstream" default:"" description:"upstream server: http://upstream-server/"`
+	StatsBufsize     int    `long:"stsize" default:"1000" description:"buffer size for http stats"`
+	StatsSpfactor    int    `long:"spfactor" default:"3" description:"sampling factor for http stats"`
 }
 
-func addStatsHandler(h http.Handler) http.Handler {
+func addStatsHandler(h http.Handler, mw *statsHTTP.Metrics) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Index(r.URL.Path, "/.api/stats") == 0 {
 			stats_api.Handler(w, r)
+		} else if strings.Index(r.URL.Path, "/.api/http-stats") == 0 {
+			d, err := mw.Data()
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+			if err := json.NewEncoder(w).Encode(d); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
 		} else {
 			h.ServeHTTP(w, r)
 		}
 	})
 }
 
-func addLogHandler(h http.Handler, logDir string, logRotate int64, logger *zap.Logger) http.Handler {
+func wrapLogHandler(h http.Handler, logDir string, logRotate int64, logger *zap.Logger) http.Handler {
 	apacheLog, err := apachelog.New(`%h %l %u %t "%r" %>s %b "%v" %D %{X-Chocon-Req}i`)
 	if err != nil {
 		logger.Fatal("could not create apache logger", zap.Error(err))
@@ -82,6 +95,10 @@ func addLogHandler(h http.Handler, logDir string, logRotate int64, logger *zap.L
 	}
 
 	return apacheLog.Wrap(h, rl)
+}
+
+func wrapStatsHandler(h http.Handler, mw *statsHTTP.Metrics) http.Handler {
+	return mw.WrapHandleFunc(h)
 }
 
 func makeTransport(keepaliveConns int, proxyReadTimeout int) http.RoundTripper {
@@ -125,8 +142,13 @@ Compiler: %s %s
 	transport := makeTransport(opts.KeepaliveConns, opts.ProxyReadTimeout)
 	var handler http.Handler = proxy.New(&transport, upstream, logger)
 
-	handler = addStatsHandler(handler)
-	handler = addLogHandler(handler, opts.LogDir, opts.LogRotate, logger)
+	statsChocon, err := statsHTTP.NewCapa(opts.StatsBufsize, opts.StatsSpfactor)
+	if err != nil {
+		log.Fatal(err)
+	}
+	handler = addStatsHandler(handler, statsChocon)
+	handler = wrapLogHandler(handler, opts.LogDir, opts.LogRotate, logger)
+	handler = wrapStatsHandler(handler, statsChocon)
 
 	server := http.Server{
 		Handler:      handler,
