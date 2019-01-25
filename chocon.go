@@ -13,8 +13,8 @@ import (
 	"github.com/jessevdk/go-flags"
 	"github.com/kazeburo/chocon/proxy"
 	"github.com/kazeburo/chocon/upstream"
-	"github.com/lestrrat/go-apache-logformat"
-	"github.com/lestrrat/go-file-rotatelogs"
+	"github.com/lestrrat-go/apache-logformat"
+	"github.com/lestrrat-go/file-rotatelogs"
 	"github.com/lestrrat/go-server-starter-listener"
 	"go.uber.org/zap"
 )
