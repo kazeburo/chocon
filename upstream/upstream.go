@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	dnscache "go.mercari.io/go-dnscache"
 	"go.uber.org/zap"
 )
@@ -21,26 +22,26 @@ type Upstream struct {
 }
 
 // New :
-func New(upstream string, logger *zap.Logger) *Upstream {
+func New(upstream string, logger *zap.Logger) (*Upstream, error) {
 	var h string
 	var p string
 	u := new(url.URL)
 
 	resolver, err := dnscache.New(3*time.Second, 10*time.Second, logger)
 	if err != nil {
-		logger.Fatal("failed to init dnscache", zap.Error(err))
+		return nil, errors.Wrap(err, "failed to init dnscache")
 	}
 
 	if upstream != "" {
 		u, err = url.Parse(upstream)
 		if err != nil {
-			logger.Fatal("upsteam url is invalid", zap.Error(err))
+			return nil, errors.Wrap(err, "upsteam url is invalid")
 		}
 		if u.Scheme != "http" && u.Scheme != "https" {
-			logger.Fatal("upsteam url is invalid: upsteam url scheme should be http or https")
+			return nil, errors.New("upsteam url is invalid: upsteam url scheme should be http or https")
 		}
 		if u.Host == "" {
-			logger.Fatal("upsteam url is invalid: no hostname")
+			return nil, errors.New("upsteam url is invalid: no hostname")
 		}
 
 		hostPortSplit := strings.Split(u.Host, ":")
@@ -52,7 +53,7 @@ func New(upstream string, logger *zap.Logger) *Upstream {
 
 		_, err = resolver.Fetch(context.Background(), h)
 		if err != nil {
-			logger.Fatal("failed to resolve upstream", zap.Error(err))
+			return nil, errors.Wrap(err, "failed to resolve upstream")
 		}
 	}
 
@@ -62,7 +63,7 @@ func New(upstream string, logger *zap.Logger) *Upstream {
 		port:     p,
 		logger:   logger,
 		resolver: resolver,
-	}
+	}, nil
 }
 
 // Enabled : upstream is enabled
