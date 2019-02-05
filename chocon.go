@@ -141,7 +141,10 @@ func main() {
 	}
 
 	logger, _ := zap.NewProduction()
-	upstream := upstream.New(opts.Upstream, logger)
+	upstream, err := upstream.New(opts.Upstream, logger)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	transport := makeTransport(opts.KeepaliveConns, opts.ProxyReadTimeout)
 	var handler http.Handler = proxy.New(&transport, upstream, logger)

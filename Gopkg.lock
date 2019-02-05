@@ -168,6 +168,7 @@
     "github.com/lestrrat-go/apache-logformat",
     "github.com/lestrrat-go/file-rotatelogs",
     "github.com/lestrrat/go-server-starter-listener",
+    "github.com/pkg/errors",
     "github.com/renstrom/shortuuid",
     "github.com/stretchr/testify/assert",
     "go.mercari.io/go-dnscache",
