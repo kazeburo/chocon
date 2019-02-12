@@ -34,6 +34,7 @@ type cmdOpts struct {
 	LogRotate        int64  `long:"access-log-rotate" default:"30" description:"Number of day before remove logs"`
 	Version          bool   `short:"v" long:"version" description:"Show version"`
 	KeepaliveConns   int    `short:"c" default:"2" long:"keepalive-conns" description:"maximum keepalive connections for upstream"`
+	MaxConnsPerHost  int    `long:"max-conns-per-host" default:"1000" description:"maximum connections per host"`
 	ReadTimeout      int    `long:"read-timeout" default:"30" description:"timeout of reading request"`
 	WriteTimeout     int    `long:"write-timeout" default:"90" description:"timeout of writing response"`
 	ProxyReadTimeout int    `long:"proxy-read-timeout" default:"60" description:"timeout of reading response from upstream"`
@@ -101,7 +102,7 @@ func wrapStatsHandler(h http.Handler, mw *statsHTTP.Metrics) http.Handler {
 	return mw.WrapHandleFunc(h)
 }
 
-func makeTransport(keepaliveConns int, proxyReadTimeout int) http.RoundTripper {
+func makeTransport(keepaliveConns int, proxyReadTimeout int, maxConnsPerHost int) http.RoundTripper {
 	return &http.Transport{
 		// inherited http.DefaultTransport
 		Proxy: http.ProxyFromEnvironment,
@@ -115,6 +116,7 @@ func makeTransport(keepaliveConns int, proxyReadTimeout int) http.RoundTripper {
 		// self-customized values
 		MaxIdleConnsPerHost:   keepaliveConns,
 		ResponseHeaderTimeout: time.Duration(proxyReadTimeout) * time.Second,
+		MaxConnsPerHost:       maxConnsPerHost,
 	}
 }
 
@@ -146,7 +148,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	transport := makeTransport(opts.KeepaliveConns, opts.ProxyReadTimeout)
+	transport := makeTransport(opts.KeepaliveConns, opts.ProxyReadTimeout, opts.MaxConnsPerHost)
 	var handler http.Handler = proxy.New(&transport, upstream, logger)
 
 	statsChocon, err := statsHTTP.NewCapa(opts.StatsBufsize, opts.StatsSpfactor)
