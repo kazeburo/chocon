@@ -7,8 +7,10 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/fukata/golang-stats-api-handler"
@@ -103,7 +105,7 @@ func wrapStatsHandler(h http.Handler, mw *statsHTTP.Metrics) http.Handler {
 }
 
 func makeTransport(keepaliveConns int, maxConnsPerHost int, proxyReadTimeout int) http.RoundTripper {
-	return &http.Transport{
+	t := &http.Transport{
 		// inherited http.DefaultTransport
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
@@ -118,6 +120,31 @@ func makeTransport(keepaliveConns int, maxConnsPerHost int, proxyReadTimeout int
 		MaxConnsPerHost:       maxConnsPerHost,
 		ResponseHeaderTimeout: time.Duration(proxyReadTimeout) * time.Second,
 	}
+	ticker := time.NewTicker(1 * time.Second)
+	// defer ticker.Stop()
+	var rlimit syscall.Rlimit
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rlimit)
+				if err != nil {
+					log.Fatal(err)
+				}
+				out, _ := exec.Command("/bin/sh", "-c", fmt.Sprintf("lsof -p %v", os.Getpid())).Output()
+				// log.Printf("%v", err)
+				lines := strings.Split(string(out), "\n")
+				fd := len(lines) - 1
+				log.Printf("rlimit = %v, open fd: %d", rlimit.Cur, fd)
+
+				if fd > 40 {
+					log.Printf("close idle connection")
+					t.CloseIdleConnections()
+				}
+			}
+		}
+	}()
+	return t
 }
 
 func printVersion() {
