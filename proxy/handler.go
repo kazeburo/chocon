@@ -3,6 +3,8 @@ package proxy
 // this class is based on https://github.com/r7kamura/entoverse
 
 import (
+	"context"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -15,7 +17,8 @@ import (
 )
 
 const (
-	proxyHeaderName = "X-Chocon-Req"
+	proxyHeaderName               = "X-Chocon-Req"
+	httpStatusClientClosedRequest = 499
 )
 
 // These headers won't be copied from original request to proxy request.
@@ -83,14 +86,29 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, originalRequest *http.
 		return
 	}
 
+	logger := proxy.logger.With(
+		zap.String("request_host", originalRequest.Host),
+		zap.String("request_path", originalRequest.URL.Path),
+		zap.String("proxy_host", proxyRequest.URL.Host),
+		zap.String("proxy_scheme", proxyRequest.URL.Scheme),
+		zap.String("proxy_id", proxyID),
+	)
+
 	// Convert a request into a response by using its Transport.
 	response, err := proxy.Transport.RoundTrip(proxyRequest)
 	if err != nil {
-		proxy.logger.Error("ErrorFromProxy", zap.Error(err))
-		if err, ok := err.(net.Error); ok && err.Timeout() {
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+			logger.Error("ErrorFromProxy", zap.Error(err))
 			writer.WriteHeader(http.StatusGatewayTimeout)
+		} else if err == context.Canceled || err == io.ErrUnexpectedEOF {
+			logger.Error("ErrorFromProxy",
+				zap.Error(fmt.Errorf("%v: seems client closed request", err)),
+			)
+			// For custom status code
+			http.Error(writer, "Client Closed Request", httpStatusClientClosedRequest)
 		} else {
-			writer.WriteHeader(http.StatusInternalServerError)
+			logger.Error("ErrorFromProxy", zap.Error(err))
+			writer.WriteHeader(http.StatusBadGateway)
 		}
 		return
 	}
@@ -104,7 +122,7 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, originalRequest *http.
 			writer.Header().Add(key, value)
 		}
 	}
-	writer.Header().Add(proxyHeaderName, proxyID)
+	writer.Header().Set(proxyHeaderName, proxyID)
 
 	// Copy a status code.
 	writer.WriteHeader(response.StatusCode)
