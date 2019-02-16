@@ -39,10 +39,13 @@ Application Options:
 --access-log-rotate=  Number of day before remove logs (default: 30)
 -v, --version             Show version
 -c, --keepalive-conns=    maximum keepalive connections for upstream (default: 2)
+--max-conns-per-host= maximum connections per host (default: 0)
 --read-timeout=       timeout of reading request (default: 30)
 --write-timeout=      timeout of writing response (default: 90)
 --proxy-read-timeout= timeout of reading response from upstream (default: 60)
---upstream=           upstream server like http://upstream-server/ (default: none)
+--upstream=           upstream server: http://upstream-server/
+--stsize=             buffer size for http stats (default: 1000)
+--spfactor=           sampling factor for http stats (default: 3)
 
 Help Options:
 -h, --help                Show this help message
