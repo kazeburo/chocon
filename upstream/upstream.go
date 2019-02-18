@@ -21,16 +21,19 @@ type Upstream struct {
 	host   string
 	ipwcs  []*IPwc
 	csum   string
-	v      uint64
 	logger *zap.Logger
-	mu     *sync.RWMutex
+	mu     sync.Mutex
+	// current resolved record version
+	version uint64
 }
 
 // IPwc : IP with counter
 type IPwc struct {
 	ip string
-	c  int64
-	v  uint64
+	// # requerst in busy
+	busy int64
+	// resolved record version
+	version uint64
 }
 
 // New :
@@ -61,12 +64,11 @@ func New(upstream string, logger *zap.Logger) (*Upstream, error) {
 	}
 
 	um := &Upstream{
-		scheme: u.Scheme,
-		host:   h,
-		port:   p,
-		v:      0,
-		logger: logger,
-		mu:     new(sync.RWMutex),
+		scheme:  u.Scheme,
+		host:    h,
+		port:    p,
+		version: 0,
+		logger:  logger,
 	}
 
 	if um.Enabled() {
@@ -95,7 +97,7 @@ func (u *Upstream) GetScheme() string {
 
 // RefreshIP : resolve hostname
 func (u *Upstream) RefreshIP(ctx context.Context) ([]*IPwc, error) {
-	u.v++
+	u.version++
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, u.host)
 	cancel()
@@ -112,9 +114,9 @@ func (u *Upstream) RefreshIP(ctx context.Context) ([]*IPwc, error) {
 	for i, ia := range addrs {
 		ips[i] = ia.IP.String()
 		ipwcs[i] = &IPwc{
-			ip: ia.IP.String(),
-			v:  u.v,
-			c:  0,
+			ip:      ia.IP.String(),
+			version: u.version,
+			busy:    0, // dummy
 		}
 	}
 	csum := strings.Join(ips, ",")
@@ -158,21 +160,21 @@ func (u *Upstream) Get() (string, *IPwc, error) {
 	}
 
 	sort.Slice(u.ipwcs, func(i, j int) bool {
-		if u.ipwcs[i].c == u.ipwcs[j].c {
+		if u.ipwcs[i].busy == u.ipwcs[j].busy {
 			return rand.Intn(1) == 0
 		}
-		return u.ipwcs[i].c < u.ipwcs[j].c
+		return u.ipwcs[i].busy < u.ipwcs[j].busy
 	})
 
-	u.ipwcs[0].c++
+	u.ipwcs[0].busy++
 	h := u.ipwcs[0].ip
 	if u.port != "" {
 		h = h + ":" + u.port
 	}
 	ipwc := &IPwc{
-		ip: u.ipwcs[0].ip,
-		v:  u.ipwcs[0].v,
-		c:  0,
+		ip:      u.ipwcs[0].ip,
+		version: u.ipwcs[0].version,
+		busy:    0,
 	}
 	return h, ipwc, nil
 }
@@ -182,8 +184,8 @@ func (u *Upstream) Release(o *IPwc) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	for i, ipwc := range u.ipwcs {
-		if ipwc.ip == o.ip && ipwc.v == o.v {
-			u.ipwcs[i].c = u.ipwcs[i].c - 1
+		if ipwc.ip == o.ip && ipwc.version == o.version {
+			u.ipwcs[i].busy = u.ipwcs[i].busy - 1
 		}
 	}
 }
