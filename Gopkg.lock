@@ -97,12 +97,12 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:2ee572ec2cbbeb51d6b77067c2dd60e419528c5ba0174ae6166bbe91cdd2e2a5"
+  digest = "1:61eefd99372027ed953d6716bcb7bd6eef201f67819cb9b9487fb40eb52c4b68"
   name = "github.com/renstrom/shortuuid"
   packages = ["."]
   pruneopts = "UT"
-  revision = "f84ba35fc5c62164a92d7eb989c87fba14bf423d"
-  version = "v3.0.1"
+  revision = "32d3e955bebaf85e3295329e0b8070440aa8fe13"
+  version = "v3.0.2"
 
 [[projects]]
   digest = "1:972c2427413d41a1e06ca4897e8528e5a1622894050e2f527b38ddf0f343f759"
@@ -111,14 +111,6 @@
   pruneopts = "UT"
   revision = "ffdc059bfe9ce6a4e144ba849dbedead332c6053"
   version = "v1.3.0"
-
-[[projects]]
-  digest = "1:4086cfa4effbd662f2e73a9be4ca3b80d15ce65b73a4f70cfe42d2d80c483a77"
-  name = "go.mercari.io/go-dnscache"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "9c60ba2751201bcc1079a467f46464936a0ef172"
-  version = "0.1.0"
 
 [[projects]]
   branch = "master"
@@ -171,7 +163,6 @@
     "github.com/pkg/errors",
     "github.com/renstrom/shortuuid",
     "github.com/stretchr/testify/assert",
-    "go.mercari.io/go-dnscache",
     "go.mercari.io/go-httpstats",
     "go.uber.org/zap",
   ]

@@ -68,7 +68,8 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, originalRequest *http.
 	status := &Status{Code: http.StatusOK}
 
 	if proxy.upstream.Enabled() {
-		h, err := proxy.upstream.GetHost(originalRequest.Context())
+		h, ipwc, err := proxy.upstream.Get()
+		defer proxy.upstream.Release(ipwc)
 		if err != nil {
 			status.Code = http.StatusBadGateway
 		}
