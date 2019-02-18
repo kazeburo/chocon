@@ -164,7 +164,7 @@ func (u *Upstream) Get() (string, *IPwc, error) {
 
 	sort.Slice(u.ipwcs, func(i, j int) bool {
 		if u.ipwcs[i].busy == u.ipwcs[j].busy {
-			return rand.Intn(1) == 0
+			return rand.Intn(2) == 0
 		}
 		return u.ipwcs[i].busy < u.ipwcs[j].busy
 	})
