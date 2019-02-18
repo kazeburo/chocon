@@ -154,6 +154,10 @@ func (u *Upstream) Get() (string, *IPwc, error) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 
+	if len(u.ipwcs) < 1 {
+		return "", &IPwc{}, errors.New("No upstream hosts")
+	}
+
 	sort.Slice(u.ipwcs, func(i, j int) bool {
 		if u.ipwcs[i].c == u.ipwcs[j].c {
 			return rand.Intn(1) == 0
