@@ -2,7 +2,6 @@ package upstream
 
 import (
 	"context"
-	"log"
 	"math/rand"
 	"net"
 	"net/url"
@@ -138,9 +137,9 @@ func (u *Upstream) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case _ = <-ticker.C:
-			for _, ipwc := range u.ipwcs {
-				log.Printf("%v", ipwc)
-			}
+			//for _, ipwc := range u.ipwcs {
+			//	log.Printf("%v", ipwc)
+			//}
 			_, err := u.RefreshIP(ctx)
 			if err != nil {
 				u.logger.Error("failed refresh ip", zap.Error(err))
