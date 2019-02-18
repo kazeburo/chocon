@@ -97,7 +97,10 @@ func (u *Upstream) GetScheme() string {
 
 // RefreshIP : resolve hostname
 func (u *Upstream) RefreshIP(ctx context.Context) ([]*IPwc, error) {
+	u.mu.Lock()
 	u.version++
+	u.mu.Unlock()
+
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, u.host)
 	cancel()
