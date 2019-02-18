@@ -119,7 +119,7 @@ func (u *Upstream) RefreshIP(ctx context.Context) ([]*IPwc, error) {
 		ipwcs[i] = &IPwc{
 			ip:      ia.IP.String(),
 			version: u.version,
-			busy:    0, // dummy
+			busy:    0,
 		}
 	}
 	csum := strings.Join(ips, ",")
@@ -177,7 +177,7 @@ func (u *Upstream) Get() (string, *IPwc, error) {
 	ipwc := &IPwc{
 		ip:      u.ipwcs[0].ip,
 		version: u.ipwcs[0].version,
-		busy:    0,
+		busy:    0, // dummy
 	}
 	return h, ipwc, nil
 }
