@@ -103,7 +103,7 @@ func (al *AccessLog) WrapHandleFunc(h http.Handler) http.Handler {
 				zap.String("ua", r.UserAgent()),
 				zap.Float64("ptime", ptime.Seconds()),
 				zap.String("host", r.Host),
-				zap.String("chocon_req", w.Header().Get("X-Chocon-Req")),
+				zap.String("chocon_req", w.Header().Get("X-Chocon-Id")),
 			)
 		}()
 		h.ServeHTTP(ww, r)
