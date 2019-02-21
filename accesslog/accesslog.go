@@ -94,7 +94,7 @@ func (al *AccessLog) WrapHandleFunc(h http.Handler) http.Handler {
 			}
 			al.logger.Info(
 				"-",
-				zap.String("time", start.Format("02/Jan/2006:15:04:05 -0700")),
+				zap.String("time", start.Format("2006/01/02 15:04:05 MST")),
 				zap.String("remote_addr", remoteAddr),
 				zap.String("method", r.Method),
 				zap.String("uri", r.URL.Path),
