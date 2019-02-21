@@ -15,7 +15,7 @@ import (
 
 // AccessLog :
 type AccessLog struct {
-	zl *zap.Logger
+	logger *zap.Logger
 }
 
 func logWriter(logDir string, logRotate int64) (io.Writer, error) {
@@ -65,7 +65,7 @@ func New(logDir string, logRotate int64) (*AccessLog, error) {
 		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
 
-	zl := zap.New(
+	logger := zap.New(
 		zapcore.NewCore(
 			zapcore.NewJSONEncoder(encoderConfig),
 			zapcore.AddSync(w),
@@ -73,13 +73,13 @@ func New(logDir string, logRotate int64) (*AccessLog, error) {
 		),
 	)
 	return &AccessLog{
-		zl: zl,
+		logger: logger,
 	}, nil
 }
 
 // WrapHandleFunc :
 func (al *AccessLog) WrapHandleFunc(h http.Handler) http.Handler {
-	if al.zl == nil {
+	if al.logger == nil {
 		return h
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -92,7 +92,7 @@ func (al *AccessLog) WrapHandleFunc(h http.Handler) http.Handler {
 			if i := strings.LastIndexByte(remoteAddr, ':'); i > -1 {
 				remoteAddr = remoteAddr[:i]
 			}
-			al.zl.Info(
+			al.logger.Info(
 				"-",
 				zap.String("time", start.Format("02/Jan/2006:15:04:05 -0700")),
 				zap.String("remote_addr", remoteAddr),
