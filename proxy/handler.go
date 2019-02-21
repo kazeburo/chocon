@@ -17,7 +17,8 @@ import (
 )
 
 const (
-	proxyHeaderName               = "X-Chocon-Req"
+	proxyVerHeader                = "X-Chocon-Ver"
+	proxyIDHeader                 = "X-Chocon-Id"
 	httpStatusClientClosedRequest = 499
 )
 
@@ -40,14 +41,16 @@ type Status struct {
 
 // Proxy : Provide host-based proxy server.
 type Proxy struct {
+	Version   string
 	Transport http.RoundTripper
 	upstream  *upstream.Upstream
 	logger    *zap.Logger
 }
 
 // New :  Create a request-based reverse-proxy.
-func New(transport *http.RoundTripper, upstream *upstream.Upstream, logger *zap.Logger) *Proxy {
+func New(transport *http.RoundTripper, version string, upstream *upstream.Upstream, logger *zap.Logger) *Proxy {
 	return &Proxy{
+		Version:   version,
 		Transport: *transport,
 		upstream:  upstream,
 		logger:    logger,
@@ -55,13 +58,18 @@ func New(transport *http.RoundTripper, upstream *upstream.Upstream, logger *zap.
 }
 
 func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, originalRequest *http.Request) {
+	proxyID := originalRequest.Header.Get(proxyIDHeader)
+	if proxyID == "" {
+		proxyID = shortuuid.New()
+		originalRequest.Header.Set(proxyIDHeader, proxyID)
+	}
+	writer.Header().Set(proxyIDHeader, proxyID)
+
 	// If request has Via: ViaHeader, stop request
-	if originalRequest.Header.Get(proxyHeaderName) != "" {
+	if originalRequest.Header.Get(proxyVerHeader) != "" {
 		writer.WriteHeader(http.StatusLoopDetected)
 		return
 	}
-
-	proxyID := shortuuid.New()
 
 	// Create a new proxy request object by coping the original request.
 	proxyRequest := proxy.copyRequest(originalRequest)
@@ -78,7 +86,7 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, originalRequest *http.
 		proxyRequest.Host = originalRequest.Host
 	} else {
 		// Set Proxied
-		originalRequest.Header.Set(proxyHeaderName, proxyID)
+		originalRequest.Header.Set(proxyVerHeader, proxy.Version)
 		// Convert an original request into another proxy request.
 		proxy.rewriteProxyHost(originalRequest, proxyRequest, status)
 	}
@@ -119,11 +127,13 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, originalRequest *http.
 
 	// Copy all header fields.
 	for key, values := range response.Header {
+		if key == proxyIDHeader {
+			continue
+		}
 		for _, value := range values {
 			writer.Header().Add(key, value)
 		}
 	}
-	writer.Header().Set(proxyHeaderName, proxyID)
 
 	// Copy a status code.
 	writer.WriteHeader(response.StatusCode)
