@@ -35,18 +35,6 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:4052fe114649b6585675a6a7599c6585c0d547c9d06bcd99d77976720c8f1a3e"
-  name = "github.com/lestrrat-go/apache-logformat"
-  packages = [
-    ".",
-    "internal/httputil",
-    "internal/logctx",
-  ]
-  pruneopts = "UT"
-  revision = "bb8451138cebab76e0759a2651b2685f56ad660a"
-
-[[projects]]
-  branch = "master"
   digest = "1:14e8f959d8494ed29af82df87eab0f80ee3b85a972c23f82f6a63f19e809e9de"
   name = "github.com/lestrrat-go/file-rotatelogs"
   packages = [
@@ -157,7 +145,6 @@
   input-imports = [
     "github.com/fukata/golang-stats-api-handler",
     "github.com/jessevdk/go-flags",
-    "github.com/lestrrat-go/apache-logformat",
     "github.com/lestrrat-go/file-rotatelogs",
     "github.com/lestrrat/go-server-starter-listener",
     "github.com/pkg/errors",
@@ -165,6 +152,7 @@
     "github.com/stretchr/testify/assert",
     "go.mercari.io/go-httpstats",
     "go.uber.org/zap",
+    "go.uber.org/zap/zapcore",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

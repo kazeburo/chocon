@@ -13,10 +13,9 @@ import (
 
 	"github.com/fukata/golang-stats-api-handler"
 	"github.com/jessevdk/go-flags"
+	"github.com/kazeburo/chocon/accesslog"
 	"github.com/kazeburo/chocon/proxy"
 	"github.com/kazeburo/chocon/upstream"
-	"github.com/lestrrat-go/apache-logformat"
-	"github.com/lestrrat-go/file-rotatelogs"
 	"github.com/lestrrat/go-server-starter-listener"
 	statsHTTP "go.mercari.io/go-httpstats"
 	"go.uber.org/zap"
@@ -62,40 +61,11 @@ func addStatsHandler(h http.Handler, mw *statsHTTP.Metrics) http.Handler {
 }
 
 func wrapLogHandler(h http.Handler, logDir string, logRotate int64, logger *zap.Logger) http.Handler {
-	apacheLog, err := apachelog.New(`%h %l %u %t "%r" %>s %b "%v" %D %{X-Chocon-Req}i`)
+	al, err := accesslog.New(logDir, logRotate)
 	if err != nil {
-		logger.Fatal("could not create apache logger", zap.Error(err))
+		logger.Fatal("could not init accesslog", zap.Error(err))
 	}
-
-	if logDir == "stdout" {
-		return apacheLog.Wrap(h, os.Stdout)
-	} else if logDir == "" {
-		return apacheLog.Wrap(h, os.Stderr)
-	} else if logDir == "none" {
-		return h
-	}
-
-	logFile := logDir
-	linkName := logDir
-	if !strings.HasSuffix(logDir, "/") {
-		logFile += "/"
-		linkName += "/"
-
-	}
-	logFile += "access_log.%Y%m%d%H%M"
-	linkName += "current"
-
-	rl, err := rotatelogs.New(
-		logFile,
-		rotatelogs.WithLinkName(linkName),
-		rotatelogs.WithMaxAge(time.Duration(logRotate)*86400*time.Second),
-		rotatelogs.WithRotationTime(time.Second*86400),
-	)
-	if err != nil {
-		logger.Fatal("rotatelogs.New failed", zap.Error(err))
-	}
-
-	return apacheLog.Wrap(h, rl)
+	return al.WrapHandleFunc(h)
 }
 
 func wrapStatsHandler(h http.Handler, mw *statsHTTP.Metrics) http.Handler {
