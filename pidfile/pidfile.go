@@ -14,17 +14,19 @@ func WritePid(pidfile string) error {
 	dir, filename := filepath.Split(pidfile)
 	tmpfile, err := ioutil.TempFile(dir, filename+".*")
 	if err != nil {
-		return errors.Wrap(err, "Cloud not create tempfile")
+		return errors.Wrap(err, "Could not create tempfile")
 	}
 	_, err = tmpfile.WriteString(fmt.Sprintf("%d", os.Getpid()))
 	if err != nil {
 		tmpfile.Close()
-		return errors.Wrap(err, "Cloud not write pid to tempfile")
+		os.Remove(tmpfile.Name())
+		return errors.Wrap(err, "Could not write pid to tempfile")
 	}
 	tmpfile.Close()
 	err = os.Rename(tmpfile.Name(), pidfile)
 	if err != nil {
-		return errors.Wrap(err, "Cloud not rename pidfile")
+		os.Remove(tmpfile.Name())
+		return errors.Wrap(err, "Could not rename pidfile")
 	}
 	return nil
 }
