@@ -14,6 +14,7 @@ import (
 	"github.com/fukata/golang-stats-api-handler"
 	"github.com/jessevdk/go-flags"
 	"github.com/kazeburo/chocon/accesslog"
+	"github.com/kazeburo/chocon/pidfile"
 	"github.com/kazeburo/chocon/proxy"
 	"github.com/kazeburo/chocon/upstream"
 	"github.com/lestrrat/go-server-starter-listener"
@@ -32,6 +33,7 @@ type cmdOpts struct {
 	LogDir           string `long:"access-log-dir" default:"" description:"directory to store logfiles"`
 	LogRotate        int64  `long:"access-log-rotate" default:"30" description:"Number of day before remove logs"`
 	Version          bool   `short:"v" long:"version" description:"Show version"`
+	PidFile          string `long:"pid-file" default:"" description:"filename to store pid. disabled by default"`
 	KeepaliveConns   int    `short:"c" default:"2" long:"keepalive-conns" description:"maximum keepalive connections for upstream"`
 	MaxConnsPerHost  int    `long:"max-conns-per-host" default:"0" description:"maximum connections per host"`
 	ReadTimeout      int    `long:"read-timeout" default:"30" description:"timeout of reading request"`
@@ -116,6 +118,13 @@ func main() {
 	upstream, err := upstream.New(opts.Upstream, logger)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if opts.PidFile != "" {
+		err = pidfile.WritePid(opts.PidFile)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	transport := makeTransport(opts.KeepaliveConns, opts.MaxConnsPerHost, opts.ProxyReadTimeout)
