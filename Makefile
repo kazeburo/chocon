@@ -23,9 +23,6 @@ check:
 fmt:
 	go fmt ./...
 
-dist:
-	git archive --format tgz HEAD -o chocon-$(VERSION).tar.gz --prefix chocon-$(VERSION)/
-
 clean:
 	rm -rf chocon chocon-*.tar.gz
 
@@ -33,3 +30,4 @@ tag:
 	git tag v${VERSION}
 	git push origin v${VERSION}
 	git push origin master
+	goreleaser --rm-dist
