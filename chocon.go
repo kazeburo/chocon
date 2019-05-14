@@ -1,14 +1,17 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/fukata/golang-stats-api-handler"
@@ -28,20 +31,21 @@ var (
 )
 
 type cmdOpts struct {
-	Listen           string `short:"l" long:"listen" default:"0.0.0.0" description:"address to bind"`
-	Port             string `short:"p" long:"port" default:"3000" description:"Port number to bind"`
-	LogDir           string `long:"access-log-dir" default:"" description:"directory to store logfiles"`
-	LogRotate        int64  `long:"access-log-rotate" default:"30" description:"Number of day before remove logs"`
-	Version          bool   `short:"v" long:"version" description:"Show version"`
-	PidFile          string `long:"pid-file" default:"" description:"filename to store pid. disabled by default"`
-	KeepaliveConns   int    `short:"c" default:"2" long:"keepalive-conns" description:"maximum keepalive connections for upstream"`
-	MaxConnsPerHost  int    `long:"max-conns-per-host" default:"0" description:"maximum connections per host"`
-	ReadTimeout      int    `long:"read-timeout" default:"30" description:"timeout of reading request"`
-	WriteTimeout     int    `long:"write-timeout" default:"90" description:"timeout of writing response"`
-	ProxyReadTimeout int    `long:"proxy-read-timeout" default:"60" description:"timeout of reading response from upstream"`
-	Upstream         string `long:"upstream" default:"" description:"upstream server: http://upstream-server/"`
-	StatsBufsize     int    `long:"stsize" default:"1000" description:"buffer size for http stats"`
-	StatsSpfactor    int    `long:"spfactor" default:"3" description:"sampling factor for http stats"`
+	Listen           string        `short:"l" long:"listen" default:"0.0.0.0" description:"address to bind"`
+	Port             string        `short:"p" long:"port" default:"3000" description:"Port number to bind"`
+	LogDir           string        `long:"access-log-dir" default:"" description:"directory to store logfiles"`
+	LogRotate        int64         `long:"access-log-rotate" default:"30" description:"Number of day before remove logs"`
+	Version          bool          `short:"v" long:"version" description:"Show version"`
+	PidFile          string        `long:"pid-file" default:"" description:"filename to store pid. disabled by default"`
+	KeepaliveConns   int           `short:"c" default:"2" long:"keepalive-conns" description:"maximum keepalive connections for upstream"`
+	MaxConnsPerHost  int           `long:"max-conns-per-host" default:"0" description:"maximum connections per host"`
+	ReadTimeout      int           `long:"read-timeout" default:"30" description:"timeout of reading request"`
+	WriteTimeout     int           `long:"write-timeout" default:"90" description:"timeout of writing response"`
+	ProxyReadTimeout int           `long:"proxy-read-timeout" default:"60" description:"timeout of reading response from upstream"`
+	ShutdownTimeout  time.Duration `long:"shutdown-timeout" default:"1h"  description:"timeout to wait for all connections to be closed."`
+	Upstream         string        `long:"upstream" default:"" description:"upstream server: http://upstream-server/"`
+	StatsBufsize     int           `long:"stsize" default:"1000" description:"buffer size for http stats"`
+	StatsSpfactor    int           `long:"spfactor" default:"3" description:"sampling factor for http stats"`
 }
 
 func addStatsHandler(h http.Handler, mw *statsHTTP.Metrics) http.Handler {
@@ -102,16 +106,20 @@ Compiler: %s %s
 }
 
 func main() {
+	os.Exit(_main())
+}
+
+func _main() int {
 	opts := cmdOpts{}
 	psr := flags.NewParser(&opts, flags.Default)
 	_, err := psr.Parse()
 	if err != nil {
-		os.Exit(1)
+		return 1
 	}
 
 	if opts.Version {
 		printVersion()
-		return
+		return 0
 	}
 
 	logger, _ := zap.NewProduction()
@@ -144,6 +152,19 @@ func main() {
 		WriteTimeout: time.Duration(opts.WriteTimeout) * time.Second,
 	}
 
+	idleConnsClosed := make(chan struct{})
+	go func() {
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGTERM)
+		<-sigChan
+		ctx, cancel := context.WithTimeout(context.Background(), opts.ShutdownTimeout)
+		if es := server.Shutdown(ctx); es != nil {
+			logger.Warn("Shutdown error", zap.Error(es))
+		}
+		cancel()
+		close(idleConnsClosed)
+	}()
+
 	l, err := ss.NewListener()
 	if l == nil || err != nil {
 		// Fallback if not running under Server::Starter
@@ -155,5 +176,11 @@ func main() {
 				zap.String("port", opts.Port))
 		}
 	}
-	server.Serve(l)
+	if err := server.Serve(l); err != http.ErrServerClosed {
+		logger.Error("Error in Serve", zap.Error(err))
+		return 1
+	}
+
+	<-idleConnsClosed
+	return 0
 }
