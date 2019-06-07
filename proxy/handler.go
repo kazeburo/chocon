@@ -46,20 +46,19 @@ type Proxy struct {
 	Transport http.RoundTripper
 	upstream  *upstream.Upstream
 	logger    *zap.Logger
-	pool      *sync.Pool
+}
+
+var pool = sync.Pool{
+	New: func() interface{} { return make([]byte, 32*1024) },
 }
 
 // New :  Create a request-based reverse-proxy.
 func New(transport *http.RoundTripper, version string, upstream *upstream.Upstream, logger *zap.Logger) *Proxy {
-	pool := sync.Pool{
-		New: func() interface{} { return make([]byte, 32*1024) },
-	}
 	return &Proxy{
 		Version:   version,
 		Transport: *transport,
 		upstream:  upstream,
 		logger:    logger,
-		pool:      &pool,
 	}
 }
 
@@ -128,8 +127,12 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, originalRequest *http.
 		return
 	}
 
-	// Ensure a response body from upstream will be always closed.
-	defer response.Body.Close()
+	buf := pool.Get().([]byte)
+	defer func() {
+		defer response.Body.Close()
+		// Ensure a response body from upstream will be always closed.
+		defer pool.Put(buf)
+	}()
 
 	// Copy all header fields.
 	nv := 0
@@ -150,8 +153,6 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, originalRequest *http.
 	writer.WriteHeader(response.StatusCode)
 
 	// Copy a response body.
-	buf := proxy.pool.Get().([]byte)
-	defer proxy.pool.Put(buf)
 	io.CopyBuffer(writer, response.Body, buf)
 }
 
