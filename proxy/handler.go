@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 
 	"github.com/kazeburo/chocon/upstream"
 	"github.com/renstrom/shortuuid"
@@ -45,6 +46,10 @@ type Proxy struct {
 	Transport http.RoundTripper
 	upstream  *upstream.Upstream
 	logger    *zap.Logger
+}
+
+var pool = sync.Pool{
+	New: func() interface{} { return make([]byte, 32*1024) },
 }
 
 // New :  Create a request-based reverse-proxy.
@@ -122,24 +127,33 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, originalRequest *http.
 		return
 	}
 
-	// Ensure a response body from upstream will be always closed.
-	defer response.Body.Close()
+	buf := pool.Get().([]byte)
+	defer func() {
+		defer response.Body.Close()
+		// Ensure a response body from upstream will be always closed.
+		defer pool.Put(buf)
+	}()
 
 	// Copy all header fields.
-	for key, values := range response.Header {
-		if key == proxyIDHeader {
+	nv := 0
+	for _, vv := range response.Header {
+		nv += len(vv)
+	}
+	sv := make([]string, nv)
+	for k, vv := range response.Header {
+		if k == proxyIDHeader {
 			continue
 		}
-		for _, value := range values {
-			writer.Header().Add(key, value)
-		}
+		n := copy(sv, vv)
+		writer.Header()[k] = sv[:n:n]
+		sv = sv[n:]
 	}
 
 	// Copy a status code.
 	writer.WriteHeader(response.StatusCode)
 
 	// Copy a response body.
-	io.Copy(writer, response.Body)
+	io.CopyBuffer(writer, response.Body, buf)
 }
 
 func (proxy *Proxy) rewriteProxyHost(r *http.Request, pr *http.Request, ps *Status) {
@@ -188,13 +202,18 @@ func (proxy *Proxy) copyRequest(originalRequest *http.Request) *http.Request {
 	proxyRequest.URL.Path = originalRequest.URL.Path
 
 	// Copy all header fields except ignoredHeaderNames'.
-	for key, values := range originalRequest.Header {
-		if _, ok := ignoredHeaderNames[key]; ok {
+	nv := 0
+	for _, vv := range originalRequest.Header {
+		nv += len(vv)
+	}
+	sv := make([]string, nv)
+	for k, vv := range originalRequest.Header {
+		if _, ok := ignoredHeaderNames[k]; ok {
 			continue
 		}
-		for _, value := range values {
-			proxyRequest.Header.Add(key, value)
-		}
+		n := copy(sv, vv)
+		proxyRequest.Header[k] = sv[:n:n]
+		sv = sv[n:]
 	}
 
 	// Append this machine's host name into X-Forwarded-For.
