@@ -177,7 +177,6 @@ func (u *Upstream) Get() (string, *IPwc, error) {
 	ipwc := &IPwc{
 		ip:      u.ipwcs[0].ip,
 		version: u.ipwcs[0].version,
-		busy:    0, // dummy
 	}
 	return h, ipwc, nil
 }

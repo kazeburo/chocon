@@ -13,7 +13,7 @@ import (
 	"sync"
 
 	"github.com/kazeburo/chocon/upstream"
-	"github.com/renstrom/shortuuid"
+	"github.com/rs/xid"
 	"go.uber.org/zap"
 )
 
@@ -65,7 +65,7 @@ func New(transport *http.RoundTripper, version string, upstream *upstream.Upstre
 func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, originalRequest *http.Request) {
 	proxyID := originalRequest.Header.Get(proxyIDHeader)
 	if proxyID == "" {
-		proxyID = shortuuid.New()
+		proxyID = xid.New().String()
 		originalRequest.Header.Set(proxyIDHeader, proxyID)
 	}
 	writer.Header().Set(proxyIDHeader, proxyID)
@@ -129,9 +129,8 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, originalRequest *http.
 
 	buf := pool.Get().([]byte)
 	defer func() {
-		defer response.Body.Close()
-		// Ensure a response body from upstream will be always closed.
-		defer pool.Put(buf)
+		response.Body.Close()
+		pool.Put(buf)
 	}()
 
 	// Copy all header fields.
@@ -215,14 +214,6 @@ func (proxy *Proxy) copyRequest(originalRequest *http.Request) *http.Request {
 		proxyRequest.Header[k] = sv[:n:n]
 		sv = sv[n:]
 	}
-
-	// Append this machine's host name into X-Forwarded-For.
-	// if requestHost, _, err := net.SplitHostPort(originalRequest.RemoteAddr); err == nil {
-	// 	if originalValues, ok := proxyRequest.Header["X-Forwarded-For"]; ok {
-	// 		requestHost = strings.Join(originalValues, ", ") + ", " + requestHost
-	// 	}
-	// 	proxyRequest.Header.Set("X-Forwarded-For", requestHost)
-	// }
 
 	return proxyRequest
 }
