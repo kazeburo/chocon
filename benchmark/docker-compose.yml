@@ -1,0 +1,18 @@
+version: "3.7"
+services:
+  chocon:
+    container_name: chocon
+    build: ./chocon
+    cap_add:
+      - NET_ADMIN    
+  server:
+    container_name: server
+    build: ./server
+    cap_add:
+      - NET_ADMIN
+  client:
+    container_name: client
+    build: ./client
+    tty: true
+    cap_add:
+      - NET_ADMIN
