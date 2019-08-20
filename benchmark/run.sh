@@ -11,7 +11,6 @@ docker-compose up -d --build
 # Make sure that the containers get shut down on error.
 clean_up () {
     docker-compose down
-    exit 1
 } 
 trap clean_up EXIT
 
@@ -29,5 +28,3 @@ docker exec chocon ab -n 100 -H "Host: server.ccnproxy.local" http://localhost:3
 
 echo "client -> [$LATENCY latency] -> server"
 docker exec client ab -n 100 http://server/
-
-docker-compose down
