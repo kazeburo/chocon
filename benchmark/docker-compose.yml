@@ -2,7 +2,9 @@ version: "3.7"
 services:
   chocon:
     container_name: chocon
-    build: ./chocon
+    build:
+      context: ../.
+      dockerfile: ./benchmark/chocon/Dockerfile
     cap_add:
       - NET_ADMIN    
   server:
