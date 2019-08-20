@@ -21,6 +21,9 @@ docker exec server tc qdisc add dev eth0 root netem delay $LATENCY
 docker exec chocon tc qdisc add dev eth0 root netem delay $LATENCY
 docker exec client tc qdisc add dev eth0 root netem delay $LATENCY
 
+# Wait until the servers are ready.
+sleep 3
+
 echo "client -> chocon -> [$LATENCY latency] -> server"
 docker exec chocon ab -n 100 -H "Host: server.ccnproxy.local" http://localhost:3000/
 
