@@ -9,4 +9,4 @@ RUN mkdir -p /root/go/bin
 RUN curl -s https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 ADD . .
 RUN /root/go/bin/dep ensure
-CMD ["go", "run", "chocon.go"]
+CMD ["go", "run", "chocon.go", "--insecure"]

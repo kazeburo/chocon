@@ -23,8 +23,14 @@ docker exec client tc qdisc add dev eth0 root netem delay $LATENCY
 # Wait until the servers are ready.
 sleep 3
 
-echo "client -> chocon -> [$LATENCY latency] -> server"
+echo "client -> [$LATENCY latency] -> server (http)"
+docker exec client ab -n 100 http://server/
+
+echo "client -> chocon -> [$LATENCY latency] -> server (http)"
 docker exec chocon ab -n 100 -H "Host: server.ccnproxy.local" http://localhost:3000/
 
-echo "client -> [$LATENCY latency] -> server"
-docker exec client ab -n 100 http://server/
+echo "client -> [$LATENCY latency] -> server (https)"
+docker exec client ab -n 100 https://server/
+
+echo "client -> chocon -> [$LATENCY latency] -> server (https)"
+docker exec chocon ab -n 100 -H "Host: server.ccnproxy-secure.local" http://localhost:3000/
