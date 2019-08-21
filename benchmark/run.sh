@@ -6,8 +6,7 @@ set -eu
 # If this is set to 10ms, the round-trip latency will be 20ms.
 LATENCY=10ms
 
-docker-compose up -d --build
-
+docker-compose up -d
 # Make sure that the containers get shut down on error.
 clean_up () {
     docker-compose down
@@ -23,14 +22,32 @@ docker exec client tc qdisc add dev eth0 root netem delay $LATENCY
 # Wait until the servers are ready.
 sleep 3
 
+# Regex pattern to filter the output of 'ab' commands.
+AB_FILTER_PATTERN="^Time per request.*\(mean\)$"
+
 echo "client -> [$LATENCY latency] -> server (http)"
-docker exec client ab -n 100 http://server/
+echo "first request"
+docker exec client ab -n 1 http://server/ | grep -E "$AB_FILTER_PATTERN"
+echo "following 100 requests"
+docker exec client ab -n 100 http://server/ | grep -E "$AB_FILTER_PATTERN"
+echo ""
 
 echo "client -> chocon -> [$LATENCY latency] -> server (http)"
-docker exec chocon ab -n 100 -H "Host: server.ccnproxy.local" http://localhost:3000/
+echo "first request"
+docker exec chocon ab -n 1 -H "Host: server.ccnproxy.local" http://localhost:3000/ | grep -E "$AB_FILTER_PATTERN"
+echo "following 100 requests"
+docker exec chocon ab -n 100 -H "Host: server.ccnproxy.local" http://localhost:3000/ | grep -E "$AB_FILTER_PATTERN"
+echo ""
 
 echo "client -> [$LATENCY latency] -> server (https)"
-docker exec client ab -n 100 https://server/
+echo "first request"
+docker exec client ab -n 1 https://server/ | grep -E "$AB_FILTER_PATTERN"
+echo "following 100 requests"
+docker exec client ab -n 100 https://server/ | grep -E "$AB_FILTER_PATTERN"
+echo ""
 
 echo "client -> chocon -> [$LATENCY latency] -> server (https)"
-docker exec chocon ab -n 100 -H "Host: server.ccnproxy-secure.local" http://localhost:3000/
+echo "first request"
+docker exec chocon ab -n 1 -H "Host: server.ccnproxy-secure.local" http://localhost:3000/ | grep -E "$AB_FILTER_PATTERN"
+echo "following 100 requests"
+docker exec chocon ab -n 100 -H "Host: server.ccnproxy-secure.local" http://localhost:3000/ | grep -E "$AB_FILTER_PATTERN"
