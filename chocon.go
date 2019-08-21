@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -14,13 +15,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/fukata/golang-stats-api-handler"
+	stats_api "github.com/fukata/golang-stats-api-handler"
 	"github.com/jessevdk/go-flags"
 	"github.com/kazeburo/chocon/accesslog"
 	"github.com/kazeburo/chocon/pidfile"
 	"github.com/kazeburo/chocon/proxy"
 	"github.com/kazeburo/chocon/upstream"
-	"github.com/lestrrat/go-server-starter-listener"
+	ss "github.com/lestrrat/go-server-starter-listener"
 	statsHTTP "go.mercari.io/go-httpstats"
 	"go.uber.org/zap"
 )
@@ -46,6 +47,7 @@ type cmdOpts struct {
 	Upstream         string        `long:"upstream" default:"" description:"upstream server: http://upstream-server/"`
 	StatsBufsize     int           `long:"stsize" default:"1000" description:"buffer size for http stats"`
 	StatsSpfactor    int           `long:"spfactor" default:"3" description:"sampling factor for http stats"`
+	Insecure         bool          `long:"insecure" description:"disable certificate verifications (only for debugging)"`
 }
 
 func addStatsHandler(h http.Handler, mw *statsHTTP.Metrics) http.Handler {
@@ -78,7 +80,13 @@ func wrapStatsHandler(h http.Handler, mw *statsHTTP.Metrics) http.Handler {
 	return mw.WrapHandleFunc(h)
 }
 
-func makeTransport(keepaliveConns int, maxConnsPerHost int, proxyReadTimeout int) http.RoundTripper {
+func makeTransport(keepaliveConns int, maxConnsPerHost int, proxyReadTimeout int, allowInsecureTLS bool) http.RoundTripper {
+	var tlsClientConfig *tls.Config
+
+	if allowInsecureTLS {
+		tlsClientConfig = &tls.Config{InsecureSkipVerify: true}
+	}
+
 	return &http.Transport{
 		// inherited http.DefaultTransport
 		Proxy: http.ProxyFromEnvironment,
@@ -93,6 +101,7 @@ func makeTransport(keepaliveConns int, maxConnsPerHost int, proxyReadTimeout int
 		MaxIdleConnsPerHost:   keepaliveConns,
 		MaxConnsPerHost:       maxConnsPerHost,
 		ResponseHeaderTimeout: time.Duration(proxyReadTimeout) * time.Second,
+		TLSClientConfig:       tlsClientConfig,
 	}
 }
 
@@ -135,7 +144,7 @@ func _main() int {
 		}
 	}
 
-	transport := makeTransport(opts.KeepaliveConns, opts.MaxConnsPerHost, opts.ProxyReadTimeout)
+	transport := makeTransport(opts.KeepaliveConns, opts.MaxConnsPerHost, opts.ProxyReadTimeout, opts.Insecure)
 	var handler http.Handler = proxy.New(&transport, Version, upstream, logger)
 
 	statsChocon, err := statsHTTP.NewCapa(opts.StatsBufsize, opts.StatsSpfactor)
