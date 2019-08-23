@@ -1,7 +1,7 @@
 package main
 
 import (
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 )
@@ -9,12 +9,7 @@ import (
 func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
-		d, err := ioutil.ReadAll(req.Body)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.Write(d)
+		io.Copy(w, req.Body)
 	})
 
 	go func() {
