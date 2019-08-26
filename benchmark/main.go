@@ -5,20 +5,76 @@ import (
 	"encoding/csv"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/kazeburo/chocon/benchmark/docker"
 )
 
-func run(useHTTPS bool, bodySize int, latency int, useChocon bool, duration int, concurrency int, keepAlive bool, n int) (int, int, error) {
-	var compose *docker.Compose
+// Set up the environment (containers) and run the benchmark using `hey` HTTP load generator.
+func run(
+	useHTTPS bool,
+	bodySize int,
+	// If this is set to 10, inter-container network latency will be 10ms
+	// i.e. the RTT between two containers will be 20ms.
+	latency int,
+	useChocon bool,
+	// Number of seconds to send requests.
+	duration int,
+	// Number of concurrent requests to be made.
+	concurrency int,
+	// If this is true, TCP connections are reused between
+	// hey and chocon (if useChocon is true), or hey and server
+	// (if useChocon is false).
+	keepAlive bool,
+	// Number of requests to make.
+	// This is ignored when `duration` is set.
+	n int,
+	// Set this to 0.5 so as to limit the chocon's cpu usage to 50%.
+	cpuLimit float32,
+	// Set this to 1024 so as to limit the chocon's memory usage to 1GB.
+	memoryLimit uint,
+) (int, int, error) {
+	containers := []*docker.Container{
+		{
+			Name: "server",
+			Build: struct {
+				Context    string
+				Dockerfile string
+			}{"./server", ""},
+			CapAdd: []string{"NET_ADMIN"},
+		},
+	}
 
 	if useChocon {
-		compose = docker.New("chocon", "server")
+		containers = append(containers, &docker.Container{
+			Name: "chocon",
+			Build: struct {
+				Context    string
+				Dockerfile string
+			}{"../.", "./benchmark/chocon/Dockerfile"},
+			CapAdd:   []string{"NET_ADMIN"},
+			Cpus:     cpuLimit,
+			MemLimit: memoryLimit,
+		})
 	} else {
-		compose = docker.New("client", "server")
+		containers = append(containers, &docker.Container{
+			Name: "client",
+			Build: struct {
+				Context    string
+				Dockerfile string
+			}{"./client", ""},
+			// Without this, the container gets shut down as soon as
+			// it has been created.
+			Tty:    true,
+			CapAdd: []string{"NET_ADMIN"},
+		})
 	}
+
+	compose := docker.New(containers...)
 
 	// Get the containers running.
 	if err := compose.Up(true); err != nil {
@@ -28,6 +84,14 @@ func run(useHTTPS bool, bodySize int, latency int, useChocon bool, duration int,
 	// Make sure the containers get shut down.
 	defer func() {
 		compose.Down()
+	}()
+
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		compose.Down()
+		os.Exit(1)
 	}()
 
 	var client *docker.Container
@@ -127,15 +191,27 @@ func run(useHTTPS bool, bodySize int, latency int, useChocon bool, duration int,
 func main() {
 	bodySize := 100
 	latency := 10
-	duration := 60
+	duration := 5
+	memoryLimit := uint(1024)
+	cpuLimit := float32(0.5)
 
 	for i := 0; i < 100; i++ {
 		for _, useHTTPS := range []bool{true, false} {
 			for _, useChocon := range []bool{true, false} {
 				for concurrency := 1; concurrency <= 2048; concurrency *= 2 {
 					for _, keepAlive := range []bool{true, false} {
-						success, fail, err := run(useHTTPS, bodySize, latency, useChocon, duration, concurrency,
-							keepAlive, 0)
+						success, fail, err := run(
+							useHTTPS,
+							bodySize,
+							latency,
+							useChocon,
+							duration,
+							concurrency,
+							keepAlive,
+							0,
+							cpuLimit,
+							memoryLimit,
+						)
 
 						if err != nil {
 							log.Fatal(err)
