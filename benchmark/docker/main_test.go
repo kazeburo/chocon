@@ -43,6 +43,10 @@ func TestMakeYaml(t *testing.T) {
 			}{tmpDir, ""},
 			Tty:    true,
 			CapAdd: []string{"NET_ADMIN"},
+			Ports: []struct {
+				Host  uint
+				Guest uint
+			}{{3000, 3000}},
 		},
 	})
 

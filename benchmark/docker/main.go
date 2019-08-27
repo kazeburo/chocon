@@ -81,6 +81,10 @@ type Container struct {
 	Cpus float32
 	// Set this to 1024 in order to limit memory usage to 1024MB.
 	MemLimit uint
+	Ports    []struct {
+		Host  uint
+		Guest uint
+	}
 }
 
 // Execute a command inside the docker container. It calls `docker <container> exec ...` internally.
@@ -128,6 +132,14 @@ func makeYaml(containers []*Container) ([]byte, error) {
 
 			if len(container.CapAdd) > 0 {
 				mmm["cap_add"] = container.CapAdd
+			}
+
+			if len(container.Ports) > 0 {
+				l := []string{}
+				for _, i := range container.Ports {
+					l = append(l, fmt.Sprintf("%d:%d", i.Host, i.Guest))
+				}
+				mmm["ports"] = l
 			}
 
 			mm[container.Name] = mmm
