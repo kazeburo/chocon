@@ -3,9 +3,10 @@ package main
 import (
 	"bytes"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
-	"math"
 	"os"
 	"os/signal"
 	"strconv"
@@ -182,42 +183,104 @@ func run(
 	return success, fail, nil
 }
 
+const eps = 1e-6
+
+type bools []bool
+
+func (b *bools) slice(defaultVal bool) []bool {
+	if b == nil {
+		return []bool{defaultVal}
+	}
+
+	return *b
+}
+
+type nums struct {
+	Mul   bool
+	Begin float64
+	End   float64
+	Step  float64
+}
+
+func (n *nums) slice(defaultVal float64) []float64 {
+	ret := make([]float64, 0)
+
+	if n == nil {
+		return append(ret, defaultVal)
+	}
+
+	i := n.Begin
+
+	for i < n.End+eps {
+		ret = append(ret, i)
+
+		if n.Mul {
+			i *= n.Step
+		} else {
+			i += n.Step
+		}
+	}
+
+	return ret
+}
+
 func main() {
-	bodySize := 100
-	latency := 10
-	duration := 30
+	b, err := ioutil.ReadAll(os.Stdin)
 
-	fmt.Println("useHTTPS", "bodySize", "latency", "useChocon", "duration", "concurrency", "keepAlive", "cpuLimit", "memoryLimit", "success", "fail")
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	for memoryLimit := uint(256); memoryLimit <= 4*1024; memoryLimit += 256 {
-		for cpuLimit := float32(0.5); cpuLimit <= 2; cpuLimit += 0.25 {
-			for _, useHTTPS := range []bool{true, false} {
-				for _, useChocon := range []bool{true, false} {
-					for concurrency := float64(1); concurrency <= 2048; concurrency *= math.Sqrt2 {
-						for _, keepAlive := range []bool{true, false} {
-							if !useChocon && memoryLimit != 256 && cpuLimit != 0.5 {
-								continue
+	c := struct {
+		BodySize    *nums
+		Latency     *nums
+		Duration    *nums
+		MemoryLimit *nums
+		CPULimit    *nums
+		UseHTTPS    *bools
+		UseChocon   *bools
+		Concurrency *nums
+		KeepAlive   *bools
+	}{}
+
+	if err := json.Unmarshal(b, &c); err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(
+		"useHTTPS", "bodySize", "latency", "useChocon", "duration",
+		"concurrency", "keepAlive", "cpuLimit", "memoryLimit",
+		"success", "fail",
+	)
+
+	for _, bodySize := range c.BodySize.slice(100) {
+		for _, latency := range c.Latency.slice(100) {
+			for _, duration := range c.Duration.slice(30) {
+				for _, memoryLimit := range c.MemoryLimit.slice(2048) {
+					for _, cpuLimit := range c.CPULimit.slice(1) {
+						for _, useHTTPS := range c.UseHTTPS.slice(true) {
+							for _, useChocon := range c.UseChocon.slice(true) {
+								for _, concurrency := range c.Concurrency.slice(10) {
+									for _, keepAlive := range c.KeepAlive.slice(true) {
+										success, fail, err := run(
+											useHTTPS, int(bodySize+eps), int(latency+eps), useChocon, int(duration+eps),
+											// Round the float to its nearest int.
+											int(concurrency+eps),
+											keepAlive, 0, float32(cpuLimit), uint(memoryLimit+eps),
+										)
+
+										if err != nil {
+											log.Fatal(err)
+										}
+
+										fmt.Println(
+											useHTTPS, int(bodySize+eps), int(latency+eps), useChocon, int(duration+eps),
+											int(concurrency+eps), keepAlive, 0, float32(cpuLimit), uint(memoryLimit+eps),
+											success, fail,
+										)
+									}
+								}
 							}
-
-							success, fail, err := run(
-								useHTTPS,
-								bodySize,
-								latency,
-								useChocon,
-								duration,
-								// Round the float to its nearest int.
-								int(concurrency+0.5),
-								keepAlive,
-								0,
-								cpuLimit,
-								memoryLimit,
-							)
-
-							if err != nil {
-								log.Fatal(err)
-							}
-
-							fmt.Println(useHTTPS, bodySize, latency, useChocon, duration, int(concurrency+0.5), keepAlive, cpuLimit, memoryLimit, success, fail)
 						}
 					}
 				}
