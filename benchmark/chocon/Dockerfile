@@ -4,10 +4,9 @@ RUN apt-get update && \
     apt-get install software-properties-common -y && \
     add-apt-repository ppa:longsleep/golang-backports && \
     apt-get update && \
-    apt-get install golang-go build-essential git iproute2 apache2-utils curl -y
+    apt-get install golang-go build-essential git curl -y
 RUN mkdir -p /root/go/bin
 RUN curl -s https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 ADD . .
 RUN /root/go/bin/dep ensure
-RUN go get -u github.com/rakyll/hey
-CMD ["go", "run", "chocon.go", "--insecure"]
+CMD ["go", "run", "chocon.go", "--insecure", "--port=80"]

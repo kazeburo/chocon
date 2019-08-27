@@ -48,6 +48,17 @@ func run(
 			}{"./server", ""},
 			CapAdd: []string{"NET_ADMIN"},
 		},
+		{
+			Name: "client",
+			Build: struct {
+				Context    string
+				Dockerfile string
+			}{"./client", ""},
+			// Without this, the container gets shut down as soon as
+			// it has been created.
+			Tty:    true,
+			CapAdd: []string{"NET_ADMIN"},
+		},
 	}
 
 	if useChocon {
@@ -60,18 +71,6 @@ func run(
 			CapAdd:   []string{"NET_ADMIN"},
 			Cpus:     cpuLimit,
 			MemLimit: memoryLimit,
-		})
-	} else {
-		containers = append(containers, &docker.Container{
-			Name: "client",
-			Build: struct {
-				Context    string
-				Dockerfile string
-			}{"./client", ""},
-			// Without this, the container gets shut down as soon as
-			// it has been created.
-			Tty:    true,
-			CapAdd: []string{"NET_ADMIN"},
 		})
 	}
 
@@ -95,21 +94,15 @@ func run(
 		os.Exit(1)
 	}()
 
-	var client *docker.Container
-	if useChocon {
-		client, _ = compose.Container("chocon")
-	} else {
-		client, _ = compose.Container("client")
-	}
+	client, _ := compose.Container("client")
+	server, _ := compose.Container("server")
 
 	// Add network latencies between containers.
-	for _, container := range compose.Containers {
-		if _, _, err := container.Execute(
-			"tc", "qdisc", "add", "dev", "eth0", "root", "netem", "delay",
-			fmt.Sprintf("%dms", latency),
-		); err != nil {
-			return 0, 0, err
-		}
+	if _, _, err := server.Execute(
+		"tc", "qdisc", "add", "dev", "eth0", "root", "netem", "delay",
+		fmt.Sprintf("%dms", latency*2),
+	); err != nil {
+		return 0, 0, err
 	}
 
 	// Make a dummy file.
@@ -146,7 +139,7 @@ func run(
 			args = append(args, "server.ccnproxy.local")
 		}
 
-		args = append(args, "http://localhost:3000/")
+		args = append(args, "http://chocon/")
 	} else {
 		if useHTTPS {
 			args = append(args, "https://server/")
