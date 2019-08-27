@@ -35,7 +35,7 @@ func (c *Compose) Container(name string) (*Container, error) {
 }
 
 // Up gets the containers running. It calls `docker-compose up` internally.
-func (c *Compose) Up(detached bool) error {
+func (c *Compose) Up(detached bool, build bool) error {
 	yamlOut, err := makeYaml(c.Containers)
 
 	if err != nil {
@@ -51,6 +51,10 @@ func (c *Compose) Up(detached bool) error {
 
 	if detached {
 		args = append(args, "-d")
+	}
+
+	if build {
+		args = append(args, "--build")
 	}
 
 	return exec.Command(cmd, args...).Run()

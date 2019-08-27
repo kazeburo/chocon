@@ -78,7 +78,7 @@ func run(
 	compose := docker.New(containers...)
 
 	// Get the containers running.
-	if err := compose.Up(true); err != nil {
+	if err := compose.Up(true, true); err != nil {
 		return 0, 0, err
 	}
 
