@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"os/signal"
 	"strconv"
@@ -191,33 +192,40 @@ func run(
 func main() {
 	bodySize := 100
 	latency := 10
-	duration := 5
-	memoryLimit := uint(1024)
-	cpuLimit := float32(0.5)
+	duration := 30
 
-	for i := 0; i < 100; i++ {
-		for _, useHTTPS := range []bool{true, false} {
-			for _, useChocon := range []bool{true, false} {
-				for concurrency := 1; concurrency <= 2048; concurrency *= 2 {
-					for _, keepAlive := range []bool{true, false} {
-						success, fail, err := run(
-							useHTTPS,
-							bodySize,
-							latency,
-							useChocon,
-							duration,
-							concurrency,
-							keepAlive,
-							0,
-							cpuLimit,
-							memoryLimit,
-						)
+	fmt.Println("useHTTPS", "bodySize", "latency", "useChocon", "duration", "concurrency", "keepAlive", "cpuLimit", "memoryLimit", "success", "fail")
 
-						if err != nil {
-							log.Fatal(err)
+	for memoryLimit := uint(256); memoryLimit <= 4*1024; memoryLimit += 256 {
+		for cpuLimit := float32(0.5); cpuLimit <= 2; cpuLimit += 0.25 {
+			for _, useHTTPS := range []bool{true, false} {
+				for _, useChocon := range []bool{true, false} {
+					for concurrency := float64(1); concurrency <= 2048; concurrency *= math.Sqrt2 {
+						for _, keepAlive := range []bool{true, false} {
+							if !useChocon && memoryLimit != 256 && cpuLimit != 0.5 {
+								continue
+							}
+
+							success, fail, err := run(
+								useHTTPS,
+								bodySize,
+								latency,
+								useChocon,
+								duration,
+								// Round the float to its nearest int.
+								int(concurrency+0.5),
+								keepAlive,
+								0,
+								cpuLimit,
+								memoryLimit,
+							)
+
+							if err != nil {
+								log.Fatal(err)
+							}
+
+							fmt.Println(useHTTPS, bodySize, latency, useChocon, duration, int(concurrency+0.5), keepAlive, cpuLimit, memoryLimit, success, fail)
 						}
-
-						fmt.Println(useHTTPS, bodySize, latency, useChocon, duration, concurrency, keepAlive, success, fail)
 					}
 				}
 			}
