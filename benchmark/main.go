@@ -39,7 +39,7 @@ func run(
 	cpuLimit float32,
 	// Set this to 1024 so as to limit the chocon's memory usage to 1GB.
 	memoryLimit uint,
-) (int, int, error) {
+) (int, int, float64, error) {
 	containers := []*docker.Container{
 		{
 			Name: "server",
@@ -79,7 +79,7 @@ func run(
 
 	// Get the containers running.
 	if err := compose.Up(true, true); err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 
 	// Make sure the containers get shut down.
@@ -103,7 +103,7 @@ func run(
 		"tc", "qdisc", "add", "dev", "eth0", "root", "netem", "delay",
 		fmt.Sprintf("%dms", latency*2),
 	); err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 
 	// Make a dummy file.
@@ -152,19 +152,21 @@ func run(
 	stdout, _, err := client.Execute("/root/go/bin/hey", args...)
 
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 
 	records, err := csv.NewReader(bytes.NewReader(stdout)).ReadAll()
 
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, 0, err
 	}
 
 	// The number of responses with 200 status code.
 	success := 0
 	// The number of responses with non-200 status code.
 	fail := 0
+
+	responseTimeSum := float64(0)
 
 	keys := records[0]
 
@@ -176,11 +178,21 @@ func run(
 				} else {
 					fail++
 				}
+			} else if key == "response-time" {
+				r, err := strconv.ParseFloat(record[i], 64)
+
+				if err != nil {
+					return 0, 0, 0, err
+				}
+
+				responseTimeSum += r
 			}
 		}
 	}
 
-	return success, fail, nil
+	responseTime := responseTimeSum / float64(success+fail)
+
+	return success, fail, responseTime, nil
 }
 
 const eps = 1e-6
@@ -250,7 +262,7 @@ func main() {
 	fmt.Println(
 		"useHTTPS", "bodySize", "latency", "useChocon", "duration",
 		"concurrency", "keepAlive", "cpuLimit", "memoryLimit",
-		"success", "fail",
+		"success", "fail", "responseTime",
 	)
 
 	for _, bodySize := range c.BodySize.slice(100) {
@@ -262,7 +274,7 @@ func main() {
 							for _, useChocon := range c.UseChocon.slice(true) {
 								for _, concurrency := range c.Concurrency.slice(10) {
 									for _, keepAlive := range c.KeepAlive.slice(true) {
-										success, fail, err := run(
+										success, fail, responseTime, err := run(
 											useHTTPS, int(bodySize+eps), int(latency+eps), useChocon, int(duration+eps),
 											// Round the float to its nearest int.
 											int(concurrency+eps),
@@ -276,7 +288,7 @@ func main() {
 										fmt.Println(
 											useHTTPS, int(bodySize+eps), int(latency+eps), useChocon, int(duration+eps),
 											int(concurrency+eps), keepAlive, 0, float32(cpuLimit), uint(memoryLimit+eps),
-											success, fail,
+											success, fail, responseTime,
 										)
 									}
 								}
