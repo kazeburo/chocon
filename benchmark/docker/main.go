@@ -89,6 +89,10 @@ type Container struct {
 		Host  uint
 		Guest uint
 	}
+	Environment []struct {
+		Key   string
+		Value string
+	}
 }
 
 // Execute a command inside the docker container. It calls `docker <container> exec ...` internally.
@@ -144,6 +148,14 @@ func makeYaml(containers []*Container) ([]byte, error) {
 					l = append(l, fmt.Sprintf("%d:%d", i.Host, i.Guest))
 				}
 				mmm["ports"] = l
+			}
+
+			if len(container.Environment) > 0 {
+				l := []string{}
+				for _, i := range container.Environment {
+					l = append(l, fmt.Sprintf("%s=%s", i.Key, i.Value))
+				}
+				mmm["environment"] = l
 			}
 
 			mm[container.Name] = mmm

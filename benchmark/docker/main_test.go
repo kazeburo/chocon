@@ -47,6 +47,10 @@ func TestMakeYaml(t *testing.T) {
 				Host  uint
 				Guest uint
 			}{{3000, 3000}},
+			Environment: []struct {
+				Key   string
+				Value string
+			}{{"key", "value"}},
 		},
 	})
 
