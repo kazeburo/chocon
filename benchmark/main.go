@@ -40,6 +40,18 @@ func run(
 	// Set this to 1024 so as to limit the chocon's memory usage to 1GB.
 	memoryLimit uint,
 ) (int, int, float64, error) {
+	serverEnvironment := []struct {
+		Key   string
+		Value string
+	}{}
+
+	if useHTTPS {
+		serverEnvironment = append(serverEnvironment, struct {
+			Key   string
+			Value string
+		}{"HTTPS", "1"})
+	}
+
 	containers := []*docker.Container{
 		{
 			Name: "server",
@@ -47,7 +59,8 @@ func run(
 				Context    string
 				Dockerfile string
 			}{"./server", ""},
-			CapAdd: []string{"NET_ADMIN"},
+			CapAdd:      []string{"NET_ADMIN"},
+			Environment: serverEnvironment,
 		},
 		{
 			Name: "client",
@@ -268,17 +281,20 @@ func main() {
 	for _, bodySize := range c.BodySize.slice(100) {
 		for _, latency := range c.Latency.slice(100) {
 			for _, duration := range c.Duration.slice(30) {
-				for _, memoryLimit := range c.MemoryLimit.slice(2048) {
-					for _, cpuLimit := range c.CPULimit.slice(1) {
+				for memoryLimitIdx, memoryLimit := range c.MemoryLimit.slice(2048) {
+					for cpuLimitIdx, cpuLimit := range c.CPULimit.slice(1) {
 						for _, useHTTPS := range c.UseHTTPS.slice(true) {
 							for _, useChocon := range c.UseChocon.slice(true) {
 								for _, concurrency := range c.Concurrency.slice(10) {
 									for _, keepAlive := range c.KeepAlive.slice(true) {
+										// When chocon is not used, memoryLimit and cpuLimit have no effects.
+										if !useChocon && memoryLimitIdx != 0 && cpuLimitIdx != 0 {
+											continue
+										}
+
 										success, fail, responseTime, err := run(
 											useHTTPS, int(bodySize+eps), int(latency+eps), useChocon, int(duration+eps),
-											// Round the float to its nearest int.
-											int(concurrency+eps),
-											keepAlive, 0, float32(cpuLimit), uint(memoryLimit+eps),
+											int(concurrency+eps), keepAlive, 0, float32(cpuLimit), uint(memoryLimit+eps),
 										)
 
 										if err != nil {
@@ -287,7 +303,7 @@ func main() {
 
 										fmt.Println(
 											useHTTPS, int(bodySize+eps), int(latency+eps), useChocon, int(duration+eps),
-											int(concurrency+eps), keepAlive, 0, float32(cpuLimit), uint(memoryLimit+eps),
+											int(concurrency+eps), keepAlive, float32(cpuLimit), uint(memoryLimit+eps),
 											success, fail, responseTime,
 										)
 									}

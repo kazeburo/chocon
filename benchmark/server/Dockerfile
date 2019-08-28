@@ -4,7 +4,7 @@ RUN apt-get update && \
     apt-get install software-properties-common -y && \
     add-apt-repository ppa:longsleep/golang-backports && \
     apt-get update && \
-    apt-get install golang-go openssl iproute2 -y
+    apt-get install golang-go openssl iproute2 git -y
 RUN openssl req \
     -x509 \
     -nodes \
@@ -13,5 +13,6 @@ RUN openssl req \
     -out server.crt \
     -days 3650 \
     -subj "/C=JP"
+RUN go get github.com/valyala/fasthttp
 ADD main.go .
 CMD ["go", "run", "main.go"]

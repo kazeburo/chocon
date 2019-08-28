@@ -1,28 +1,29 @@
 package main
 
 import (
-	"io"
 	"log"
-	"net/http"
+	"os"
+
+	"github.com/valyala/fasthttp"
 )
 
 func main() {
-	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("Content-Type", "text/plain")
-		io.Copy(w, req.Body)
-	})
+	s := fasthttp.Server{
+		Handler: func(ctx *fasthttp.RequestCtx) {
+			ctx.SetContentType("text/plain")
+			ctx.Write(ctx.PostBody())
+		},
+	}
 
-	go func() {
-		err := http.ListenAndServe(":80", nil)
+	useHTTPS := os.Getenv("HTTPS") != ""
 
-		if err != nil {
-			log.Fatal("ListenAndServe", err)
+	if useHTTPS {
+		if err := s.ListenAndServeTLS(":443", "server.crt", "server.key"); err != nil {
+			log.Fatal(err)
 		}
-	}()
-
-	err := http.ListenAndServeTLS(":443", "server.crt", "server.key", nil)
-
-	if err != nil {
-		log.Fatal("ListenAndServeTLS", err)
+	} else {
+		if err := s.ListenAndServe(":80"); err != nil {
+			log.Fatal(err)
+		}
 	}
 }
