@@ -93,6 +93,7 @@ type Container struct {
 		Key   string
 		Value string
 	}
+	Command string
 }
 
 // Execute a command inside the docker container. It calls `docker <container> exec ...` internally.
@@ -119,6 +120,10 @@ func makeYaml(containers []*Container) ([]byte, error) {
 			mmm["container_name"] = container.Name
 
 			mmm["tty"] = container.Tty
+
+			if container.Command != "" {
+				mmm["command"] = container.Command
+			}
 
 			if container.Cpus != 0 {
 				mmm["cpus"] = fmt.Sprintf("%f", container.Cpus)

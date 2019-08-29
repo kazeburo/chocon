@@ -288,7 +288,7 @@ func main() {
 								for _, concurrency := range c.Concurrency.slice(10) {
 									for _, keepAlive := range c.KeepAlive.slice(true) {
 										// When chocon is not used, memoryLimit and cpuLimit have no effects.
-										if !useChocon && memoryLimitIdx != 0 && cpuLimitIdx != 0 {
+										if !useChocon && (memoryLimitIdx != 0 || cpuLimitIdx != 0) {
 											continue
 										}
 
