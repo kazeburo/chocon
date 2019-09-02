@@ -5,8 +5,8 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"io"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"sync"
@@ -20,19 +20,27 @@ import (
 	"go.uber.org/zap"
 )
 
-// echoServer implements http.Handler.
-type echoServer struct {
+// testServer implements http.Handler.
+type testServer struct {
 	host  string
 	port  uint
 	https bool
 	// Stores the most recent request.
-	lastRequest *http.Request
-	mu          *sync.Mutex
+	lastRequest     *http.Request
+	lastRequestLock *sync.Mutex
+}
+
+func (s *testServer) response(method string, reqBody []byte) []byte {
+	if method == "GET" {
+		return []byte(fmt.Sprintf("hello from %s", s.host))
+	}
+
+	return reqBody
 }
 
 // The output will be like 'foo.ccnproxy', 'foo.ccnproxy:3000' or 'foo.ccnproxy-secure.'
-// Chocon expects them to be set in the host header.
-func (s *echoServer) hostForChocon() string {
+// Chocon expects them to be set in the host header for selecting the target server.
+func (s *testServer) hostForChocon() string {
 	host := s.host
 
 	if s.https {
@@ -52,41 +60,40 @@ func (s *echoServer) hostForChocon() string {
 	return host
 }
 
-func (s *echoServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(200)
-
+func (s *testServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	time.Sleep(time.Millisecond * 10)
 
-	s.mu.Lock()
+	s.lastRequestLock.Lock()
 	s.lastRequest = r
-	s.mu.Unlock()
+	s.lastRequestLock.Unlock()
 
-	if r.Method == "GET" {
-		fmt.Fprintf(w, "response from %s", s.host)
+	reqBody, err := ioutil.ReadAll(r.Body)
+
+	if err != nil {
+		w.WriteHeader(400)
 		return
 	}
 
-	// Echoes back the content when the server has received a non-GET request.
-	if _, err := io.Copy(w, r.Body); err != nil {
+	if _, err := w.Write(s.response(r.Method, reqBody)); err != nil {
 		w.WriteHeader(400)
 		return
 	}
 }
 
-var servers = []*echoServer{
+var servers = []*testServer{
 	{"foo", 80, false, nil, &sync.Mutex{}},
 	{"bar", 3000, false, nil, &sync.Mutex{}},
 	{"baz", 443, true, nil, &sync.Mutex{}},
 }
 
-// This sets up the client, the proxy, the echo server, and the connections among them.
-// After that, the request is sent to chocon and its response is returned.
-func sendRequestViaChocon(t *testing.T, req *http.Request) *http.Response {
+// Sets up a client, a proxy(chocon), an echo server, and connections among them.
+// Then `f` is called with the client.
+func testChocon(t *testing.T, f func(t *testing.T, client *http.Client)) {
 	// This is used for client-proxy connection.
 	ln := fasthttputil.NewInmemoryListener()
 
 	// These are used for proxy-server connections.
-	lns := make(map[*echoServer]*fasthttputil.InmemoryListener)
+	lns := make(map[*testServer]*fasthttputil.InmemoryListener)
 	for _, server := range servers {
 		lns[server] = fasthttputil.NewInmemoryListener()
 	}
@@ -110,7 +117,7 @@ func sendRequestViaChocon(t *testing.T, req *http.Request) *http.Response {
 				}
 			}
 
-			t.Fatal("invalid dialing")
+			log.Fatal("invalid dialing")
 
 			// This never gets called.
 			return nil, nil
@@ -120,7 +127,7 @@ func sendRequestViaChocon(t *testing.T, req *http.Request) *http.Response {
 
 	// Get the servers running.
 	for _, server := range servers {
-		go func(s *echoServer) {
+		go func(s *testServer) {
 			var err error
 
 			if s.https {
@@ -134,7 +141,6 @@ func sendRequestViaChocon(t *testing.T, req *http.Request) *http.Response {
 			}
 		}(server)
 	}
-
 	// Get the proxy running.
 	go func() {
 		err := fasthttp.Serve(ln, proxy.Handler)
@@ -144,134 +150,84 @@ func sendRequestViaChocon(t *testing.T, req *http.Request) *http.Response {
 		}
 	}()
 
+	f(t, client)
+}
+
+func testChoconOneRequest(t *testing.T, client *http.Client, target *testServer, method string, reqBody []byte) {
+	req, err := http.NewRequest(method, "http://...", bytes.NewBuffer(reqBody))
+	req.Header.Add("some-key", "some-value")
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Host = target.hostForChocon()
 	res, err := client.Do(req)
-
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	return res
+	resBody, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, res.StatusCode, 200, "status code should be 200")
+	assert.ElementsMatch(t, resBody, target.response(method, reqBody), "the response body should be correct")
+	assert.Equal(t, target.lastRequest.Header.Get("some-key"), "some-value", "header values should have been passed to the target")
+	assert.NotZero(t, res.Header.Get("x-chocon-id"), "x-chocon-id header value should be set")
 }
 
-// See if requests are directed to correct target servers.
-func TestChoconHostSelection(t *testing.T) {
-	for _, server := range servers {
-		req, _ := http.NewRequest("GET", "http://chocon", nil)
+func TestChoconGETSingle(t *testing.T) {
+	testChocon(t, func(t *testing.T, client *http.Client) {
+		testChoconOneRequest(t, client, servers[0], "GET", nil)
+	})
+}
 
-		req.Host = server.hostForChocon()
+func TestChoconPOSTSingle(t *testing.T) {
+	testChocon(t, func(t *testing.T, client *http.Client) {
+		testChoconOneRequest(t, client, servers[0], "POST", []byte("request"))
+	})
+}
 
-		res := sendRequestViaChocon(t, req)
+func TestChoconPostConcurrentLarge(t *testing.T) {
+	reqBody := ""
+	for i := 0; i < 100000; i++ {
+		reqBody += "a"
+	}
+	testChocon(t, func(t *testing.T, client *http.Client) {
+		testChoconOneRequest(t, client, servers[0], "POST", []byte(reqBody))
+	})
+}
 
-		body, err := ioutil.ReadAll(res.Body)
-
-		if err != nil {
-			t.Fatal(err)
+func TestChoconPOSTSerial(t *testing.T) {
+	testChocon(t, func(t *testing.T, client *http.Client) {
+		for i, server := range servers {
+			for j := 0; j < 10; j++ {
+				testChoconOneRequest(t, client, server, "POST", []byte(fmt.Sprintf("request %d %d", i, j)))
+			}
 		}
-
-		assert.Equal(t, res.StatusCode, 200)
-		assert.Equal(t, string(body), fmt.Sprintf("response from %s", server.host))
-	}
+	})
 }
 
-// Sends a POST request.
-func TestChoconPost(t *testing.T) {
-	server := servers[0]
-	req, _ := http.NewRequest("POST", "http://chocon", bytes.NewBufferString("hello"))
-
-	req.Host = server.hostForChocon()
-
-	res := sendRequestViaChocon(t, req)
-
-	body, err := ioutil.ReadAll(res.Body)
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assert.Equal(t, res.StatusCode, 200)
-	assert.Equal(t, string(body), "hello")
-}
-
-// Sends a PUT request.
-func TestChoconPut(t *testing.T) {
-	server := servers[0]
-	req, _ := http.NewRequest("PUT", "http://chocon", bytes.NewBufferString("hello"))
-
-	req.Host = server.hostForChocon()
-
-	res := sendRequestViaChocon(t, req)
-
-	body, err := ioutil.ReadAll(res.Body)
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assert.Equal(t, res.StatusCode, 200)
-	assert.Equal(t, string(body), "hello")
-}
-
-// Sends a GET request.
-func TestChoconGet(t *testing.T) {
-	server := servers[0]
-	req, _ := http.NewRequest("GET", "http://chocon", nil)
-	req.Host = server.hostForChocon()
-
-	res := sendRequestViaChocon(t, req)
-
-	body, err := ioutil.ReadAll(res.Body)
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assert.Equal(t, res.StatusCode, 200)
-	assert.Equal(t, string(body), fmt.Sprintf("response from %s", server.host))
-}
-
-// See if the original request's header values are passed to the target server.
-func TestChoconHeader(t *testing.T) {
-	server := servers[0]
-	req, _ := http.NewRequest("GET", "http://chocon", nil)
-	req.Host = server.hostForChocon()
-	req.Header.Set("some-key", "some-value")
-
-	res := sendRequestViaChocon(t, req)
-
-	body, err := ioutil.ReadAll(res.Body)
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assert.Equal(t, res.StatusCode, 200)
-	assert.Equal(t, string(body), fmt.Sprintf("response from %s", server.host))
-	assert.Equal(t, server.lastRequest.Header.Get("some-key"), "some-value")
-}
-
-// We have to be careful about race conditions when fasthttp is used.
-// Test this with the '-race' option to check it.
-func TestChoconHeavyLoad(t *testing.T) {
-	var wg sync.WaitGroup
-
-	for i := 0; i < 100; i++ {
+func TestChoconGETSerial(t *testing.T) {
+	testChocon(t, func(t *testing.T, client *http.Client) {
 		for _, server := range servers {
-			wg.Add(1)
-
-			go func(server *echoServer) {
-				defer wg.Done()
-
-				req, _ := http.NewRequest("GET", "http://chocon", nil)
-				req.Host = server.hostForChocon()
-				req.Header.Set("some-key", "some-value")
-
-				res := sendRequestViaChocon(t, req)
-
-				assert.Equal(t, res.StatusCode, 200)
-
-			}(server)
+			for j := 0; j < 10; j++ {
+				testChoconOneRequest(t, client, server, "GET", nil)
+			}
 		}
-	}
+	})
+}
 
-	wg.Wait()
+func TestChoconPOSTConcurrent(t *testing.T) {
+	testChocon(t, func(t *testing.T, client *http.Client) {
+		var wg sync.WaitGroup
+		for i, server := range servers {
+			for j := 0; j < 100; j++ {
+				wg.Add(1)
+				go func(i, j int, server *testServer) {
+					defer wg.Done()
+					testChoconOneRequest(t, client, server, "POST", []byte(fmt.Sprintf("request %d %d", i, j)))
+				}(i, j, server)
+			}
+		}
+		wg.Wait()
+	})
 }
