@@ -145,8 +145,15 @@ func _main() int {
 		signal.Notify(sigChan, syscall.SIGTERM)
 		<-sigChan
 
+		// The process gets shut down forcedly after timeout.
+		timer := time.NewTimer(opts.ShutdownTimeout)
+		go func() {
+			<-timer.C
+			logger.Warn("shutdown timeout")
+			os.Exit(1)
+		}()
+
 		// Graceful shutdown.
-		// TODO: Consider adding timeout.
 		if es := server.Shutdown(); es != nil {
 			logger.Warn("Shutdown error", zap.Error(es))
 		}
