@@ -100,7 +100,9 @@ func _main() int {
 	}
 
 	proxy := proxy.New(&fasthttp.Client{
-		TLSConfig: tlsClientConfig,
+		TLSConfig:           tlsClientConfig,
+		MaxConnsPerHost:     opts.MaxConnsPerHost,
+		MaxIdleConnDuration: 30 * time.Second,
 	}, Version, logger)
 
 	al, err := accesslog.New(opts.LogDir, opts.LogRotate)
