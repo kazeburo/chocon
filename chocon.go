@@ -36,13 +36,11 @@ type cmdOpts struct {
 	LogRotate        int64         `long:"access-log-rotate" default:"30" description:"Number of day before remove logs"`
 	Version          bool          `short:"v" long:"version" description:"Show version"`
 	PidFile          string        `long:"pid-file" default:"" description:"filename to store pid. disabled by default"`
-	KeepaliveConns   int           `short:"c" default:"2" long:"keepalive-conns" description:"maximum keepalive connections for upstream"`
 	MaxConnsPerHost  int           `long:"max-conns-per-host" default:"0" description:"maximum connections per host"`
 	ReadTimeout      int           `long:"read-timeout" default:"30" description:"timeout of reading request"`
 	WriteTimeout     int           `long:"write-timeout" default:"90" description:"timeout of writing response"`
 	ProxyReadTimeout int           `long:"proxy-read-timeout" default:"60" description:"timeout of reading response from upstream"`
 	ShutdownTimeout  time.Duration `long:"shutdown-timeout" default:"1h"  description:"timeout to wait for all connections to be closed."`
-	Upstream         string        `long:"upstream" default:"" description:"upstream server: http://upstream-server/"`
 	StatsBufsize     int           `long:"stsize" default:"1000" description:"buffer size for http stats"`
 	StatsSpfactor    int           `long:"spfactor" default:"3" description:"sampling factor for http stats"`
 	Insecure         bool          `long:"insecure" description:"disable certificate verifications (only for debugging)"`
@@ -94,10 +92,6 @@ func _main() int {
 	}
 
 	logger, _ := zap.NewProduction()
-
-	if opts.Upstream != "" {
-		// TODO
-	}
 
 	if opts.PidFile != "" {
 		if err := pidfile.WritePid(opts.PidFile); err != nil {
