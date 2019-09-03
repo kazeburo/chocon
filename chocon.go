@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -11,17 +12,16 @@ import (
 	"syscall"
 	"time"
 
-	"go.uber.org/zap"
-
-	ss "github.com/lestrrat/go-server-starter-listener"
-
-	"github.com/kazeburo/chocon/pidfile"
-	"github.com/kazeburo/chocon/proxy"
-
+	"github.com/fukata/golang-stats-api-handler"
 	"github.com/jessevdk/go-flags"
 	"github.com/kazeburo/chocon/accesslog"
+	"github.com/kazeburo/chocon/pidfile"
+	"github.com/kazeburo/chocon/proxy"
+	"github.com/kazeburo/chocon/stats"
+	ss "github.com/lestrrat/go-server-starter-listener"
 	"github.com/valyala/fasthttp"
-	statsHTTP "go.mercari.io/go-httpstats"
+	"github.com/valyala/fasthttp/fasthttpadaptor"
+	"go.uber.org/zap"
 )
 
 var (
@@ -48,10 +48,22 @@ type cmdOpts struct {
 	Insecure         bool          `long:"insecure" description:"disable certificate verifications (only for debugging)"`
 }
 
-func addStatsHandler(h fasthttp.RequestHandler, mw *statsHTTP.Metrics) fasthttp.RequestHandler {
+func addStatsHandler(h fasthttp.RequestHandler, mw *stats.Metrics) fasthttp.RequestHandler {
 	return func(ctx *fasthttp.RequestCtx) {
-		// TODO
-		h(ctx)
+		switch string(ctx.Path()) {
+		case "/.api/stats":
+			fasthttpadaptor.NewFastHTTPHandlerFunc(stats_api.Handler)(ctx)
+		case "/.api/http-stats":
+			d, err := mw.Data()
+			if err != nil {
+				ctx.Error(err.Error(), fasthttp.StatusInternalServerError)
+			}
+			if err := json.NewEncoder(ctx.Response.BodyWriter()).Encode(d); err != nil {
+				ctx.Error(err.Error(), fasthttp.StatusInternalServerError)
+			}
+		default:
+			h(ctx)
+		}
 	}
 }
 
@@ -111,10 +123,20 @@ func _main() int {
 		logger.Fatal("could not init accesslog", zap.Error(err))
 	}
 
+	statsChocon, err := stats.NewCapa(opts.StatsBufsize, opts.StatsSpfactor)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	handler := addStatsHandler(proxy.Handler, statsChocon)
+	handler = al.Wrap(handler)
+	handler = statsChocon.WrapHandler(handler)
+
 	server := &fasthttp.Server{
 		ReadTimeout:  time.Duration(opts.ReadTimeout) * time.Second,
 		WriteTimeout: time.Duration(opts.WriteTimeout) * time.Second,
-		Handler:      al.Wrap(proxy.Handler),
+		Handler:      handler,
 	}
 
 	idleConnsClosed := make(chan struct{})
