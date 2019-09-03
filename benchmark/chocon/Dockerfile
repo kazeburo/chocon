@@ -7,6 +7,7 @@ RUN apt-get update && \
     apt-get install golang-go build-essential git curl -y
 RUN mkdir -p /root/go/bin
 RUN curl -s https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+ADD Gopkg.toml Gopkg.lock ./
+RUN /root/go/bin/dep ensure --vendor-only
 ADD . .
-RUN /root/go/bin/dep ensure
-CMD ["go", "run", "chocon.go", "--insecure", "--port=80"]
+CMD ["go", "run", "chocon.go", "--insecure", "--port=80", "--keepalive-conns=5000"]
