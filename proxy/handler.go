@@ -1,9 +1,9 @@
 package proxy
 
 import (
+	"bytes"
 	"errors"
 	"net/http"
-	"strings"
 
 	"github.com/rs/xid"
 	"github.com/valyala/fasthttp"
@@ -60,18 +60,16 @@ func rewriteHost(req *fasthttp.Request, originalReq *fasthttp.Request) error {
 	if len(originalReq.Host()) == 0 {
 		return errInvalidHostHeader
 	}
-
-	hostPortSplit := strings.Split(string(originalReq.Host()), ":")
-
+	hostPortSplit := bytes.Split(originalReq.Host(), []byte(":"))
 	host := hostPortSplit[0]
-	port := ""
+	port := []byte("")
 	if len(hostPortSplit) > 1 {
-		port = ":" + hostPortSplit[1]
+		port = append([]byte(":"), hostPortSplit[1]...)
 	}
-	hostSplit := strings.Split(host, ".")
+	hostSplit := bytes.Split(host, []byte("."))
 	lastPartIndex := 0
 	for i, hostPart := range hostSplit {
-		if hostPart == "ccnproxy-ssl" || hostPart == "ccnproxy-secure" || hostPart == "ccnproxy-https" || hostPart == "ccnproxy" {
+		if bytes.Equal(hostPart, []byte("ccnproxy-ssl")) || bytes.Equal(hostPart, []byte("ccnproxy-secure")) || bytes.Equal(hostPart, []byte("ccnproxy-https")) || bytes.Equal(hostPart, []byte("ccnproxy")) {
 			lastPartIndex = i
 		}
 	}
@@ -80,10 +78,10 @@ func rewriteHost(req *fasthttp.Request, originalReq *fasthttp.Request) error {
 		return errInvalidHostHeader
 	}
 
-	req.URI().SetHost(strings.Join(hostSplit[0:lastPartIndex], ".") + port)
-	req.SetHostBytes(req.URI().Host())
+	req.URI().SetHostBytes(append(bytes.Join(hostSplit[0:lastPartIndex], []byte(".")), port...))
 
-	if hostSplit[lastPartIndex] == "ccnproxy-https" || hostSplit[lastPartIndex] == "ccnproxy-secure" || hostSplit[lastPartIndex] == "ccnproxy-ssl" {
+	if bytes.Equal(hostSplit[lastPartIndex], []byte("ccnproxy-https")) || bytes.Equal(hostSplit[lastPartIndex], []byte("ccnproxy-secure")) || bytes.Equal(hostSplit[lastPartIndex], []byte("ccnproxy-ssl")) {
+		// req.URI().SetSchemeBytes([]byte("https"))
 		req.URI().SetScheme("https")
 	}
 
