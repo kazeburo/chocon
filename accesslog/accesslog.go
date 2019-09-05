@@ -88,14 +88,10 @@ func (al *AccessLog) Wrap(h fasthttp.RequestHandler) fasthttp.RequestHandler {
 		defer func() {
 			end := time.Now()
 			ptime := end.Sub(start)
-			remoteAddr := ctx.RemoteAddr().String()
-			if i := strings.LastIndexByte(remoteAddr, ':'); i > -1 {
-				remoteAddr = remoteAddr[:i]
-			}
 			al.logger.Info(
 				"-",
 				zap.String("time", start.Format("2006/01/02 15:04:05 MST")),
-				zap.String("remote_addr", remoteAddr),
+				zap.String("remote_addr", ctx.RemoteIP().String()),
 				zap.ByteString("method", ctx.Method()),
 				zap.ByteString("uri", ctx.RequestURI()),
 				zap.Int("status", ctx.Response.StatusCode()),
