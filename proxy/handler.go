@@ -81,8 +81,7 @@ func rewriteHost(req *fasthttp.Request, originalReq *fasthttp.Request) error {
 	req.URI().SetHostBytes(append(bytes.Join(hostSplit[0:lastPartIndex], []byte(".")), port...))
 
 	if bytes.Equal(hostSplit[lastPartIndex], []byte("ccnproxy-https")) || bytes.Equal(hostSplit[lastPartIndex], []byte("ccnproxy-secure")) || bytes.Equal(hostSplit[lastPartIndex], []byte("ccnproxy-ssl")) {
-		// req.URI().SetSchemeBytes([]byte("https"))
-		req.URI().SetScheme("https")
+		req.URI().SetSchemeBytes([]byte("https"))
 	}
 
 	return nil
