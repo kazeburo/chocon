@@ -8,6 +8,16 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
+func BenchmarkRewriteHost(b *testing.B) {
+	originalReq := fasthttp.AcquireRequest()
+	req := fasthttp.AcquireRequest()
+	originalReq.SetHost("example.com.ccnproxy:3000")
+
+	for n := 0; n < b.N; n++ {
+		rewriteHost(req, originalReq)
+	}
+}
+
 func TestRewriteHost(t *testing.T) {
 	cases := []struct {
 		originalReqHost string
