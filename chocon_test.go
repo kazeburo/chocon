@@ -28,6 +28,7 @@ type testServer struct {
 	// Stores the most recent request.
 	lastRequest     *http.Request
 	lastRequestLock *sync.Mutex
+	statusCode      int
 }
 
 func (s *testServer) response(method string, reqBody []byte) []byte {
@@ -61,6 +62,8 @@ func (s *testServer) hostForChocon() string {
 }
 
 func (s *testServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(s.statusCode)
+
 	time.Sleep(time.Millisecond * 10)
 
 	s.lastRequestLock.Lock()
@@ -81,9 +84,10 @@ func (s *testServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 var servers = []*testServer{
-	{"foo", 80, false, nil, &sync.Mutex{}},
-	{"bar", 3000, false, nil, &sync.Mutex{}},
-	{"baz", 443, true, nil, &sync.Mutex{}},
+	{"foo", 80, false, nil, &sync.Mutex{}, 200},
+	{"bar", 3000, false, nil, &sync.Mutex{}, 200},
+	{"baz", 443, true, nil, &sync.Mutex{}, 200},
+	{"qux", 80, false, nil, &sync.Mutex{}, 404},
 }
 
 // Sets up a client, a proxy(chocon), an echo server, and connections among them.
@@ -168,7 +172,7 @@ func testChoconOneRequest(t *testing.T, client *http.Client, target *testServer,
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, res.StatusCode, 200, "status code should be 200")
+	assert.Equal(t, res.StatusCode, target.statusCode, "should return the correct status code")
 	assert.ElementsMatch(t, resBody, target.response(method, reqBody), "the response body should be correct")
 	assert.Equal(t, target.lastRequest.Header.Get("some-key"), "some-value", "header values should have been passed to the target")
 	assert.NotZero(t, res.Header.Get("x-chocon-id"), "x-chocon-id header value should be set")
