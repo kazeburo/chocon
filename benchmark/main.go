@@ -40,6 +40,32 @@ func run(
 	// Set this to 1024 so as to limit the chocon's memory usage to 1GB.
 	memoryLimit uint,
 ) (int, int, float64, error) {
+	network, err := docker.CreateNetwork("chocon_benchmark")
+
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	defer network.Remove()
+
+	serverImg, err := docker.BuildImage("./server", "")
+
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	clientImg, err := docker.BuildImage("./client", "")
+
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	choconImg, err := docker.BuildImage("../.", "./chocon/Dockerfile")
+
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
 	serverEnvironment := []struct {
 		Key   string
 		Value string
@@ -52,67 +78,65 @@ func run(
 		}{"HTTPS", "1"})
 	}
 
-	containers := []*docker.Container{
-		{
-			Name: "server",
-			Build: struct {
-				Context    string
-				Dockerfile string
-			}{"./server", ""},
-			CapAdd:      []string{"NET_ADMIN"},
-			Environment: serverEnvironment,
-		},
-		{
-			Name: "client",
-			Build: struct {
-				Context    string
-				Dockerfile string
-			}{"./client", ""},
-			// Without this, the container gets shut down as soon as
-			// it has been created.
-			Tty:    true,
-			CapAdd: []string{"NET_ADMIN"},
-		},
-	}
+	serverContainer, err := serverImg.Run(&docker.RunConfig{
+		Network:      &network,
+		Environments: serverEnvironment,
+		Tty:          true,
+		CapAdds:      []string{"NET_ADMIN"},
+	})
 
-	if useChocon {
-		containers = append(containers, &docker.Container{
-			Name: "chocon",
-			Build: struct {
-				Context    string
-				Dockerfile string
-			}{"../.", "./benchmark/chocon/Dockerfile"},
-			CapAdd:   []string{"NET_ADMIN"},
-			Cpus:     cpuLimit,
-			MemLimit: memoryLimit,
-		})
-	}
-
-	compose := docker.New(containers...)
-
-	// Get the containers running.
-	if err := compose.Up(true, true); err != nil {
+	if err != nil {
 		return 0, 0, 0, err
 	}
 
-	// Make sure the containers get shut down.
-	defer func() {
-		compose.Down()
-	}()
+	defer serverContainer.Stop()
 
+	clientContainer, err := clientImg.Run(&docker.RunConfig{
+		Network: &network,
+		Tty:     true,
+		CapAdds: []string{"NET_ADMIN"},
+	})
+
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	defer clientContainer.Stop()
+
+	var choconContainer docker.Container
+
+	if useChocon {
+		choconContainer, err = choconImg.Run(&docker.RunConfig{
+			Network:  &network,
+			Tty:      true,
+			CapAdds:  []string{"NET_ADMIN"},
+			Cpus:     cpuLimit,
+			MemLimit: memoryLimit,
+		})
+
+		if err != nil {
+			return 0, 0, 0, err
+		}
+
+		defer choconContainer.Stop()
+	}
+
+	// Make sure that the network and the containers gets removed/stopped.
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
-		compose.Down()
+		network.Remove()
+		serverContainer.Stop()
+		clientContainer.Stop()
+		if useChocon {
+			choconContainer.Stop()
+		}
 		os.Exit(1)
 	}()
 
-	client, _ := compose.Container("client")
-	server, _ := compose.Container("server")
-
 	// Add network latencies between containers.
-	if _, _, err := server.Execute(
+	if _, _, err := serverContainer.Execute(
 		"tc", "qdisc", "add", "dev", "eth0", "root", "netem", "delay",
 		fmt.Sprintf("%dms", latency*2),
 	); err != nil {
@@ -120,7 +144,7 @@ func run(
 	}
 
 	// Make a dummy file.
-	client.Execute("bash", "-c", fmt.Sprintf("yes | head -c %d > dummy", bodySize))
+	clientContainer.Execute("bash", "-c", fmt.Sprintf("yes | head -c %d > dummy", bodySize))
 
 	// Wait until the servers are ready.
 	time.Sleep(3 * time.Second)
@@ -149,21 +173,21 @@ func run(
 		args = append(args, "-host")
 
 		if useHTTPS {
-			args = append(args, "server.ccnproxy-secure.local")
+			args = append(args, fmt.Sprintf("%s.ccnproxy-secure.local", serverContainer.ID[:12]))
 		} else {
-			args = append(args, "server.ccnproxy.local")
+			args = append(args, fmt.Sprintf("%s.ccnproxy.local", serverContainer.ID[:12]))
 		}
 
-		args = append(args, "http://chocon/")
+		args = append(args, fmt.Sprintf("http://%s/", choconContainer.ID[:12]))
 	} else {
 		if useHTTPS {
-			args = append(args, "https://server/")
+			args = append(args, fmt.Sprintf("https://%s/", serverContainer.ID[:12]))
 		} else {
-			args = append(args, "http://server/")
+			args = append(args, fmt.Sprintf("http://%s/", serverContainer.ID[:12]))
 		}
 	}
 
-	stdout, _, err := client.Execute("/root/go/bin/hey", args...)
+	stdout, _, err := clientContainer.Execute("/root/go/bin/hey", args...)
 
 	if err != nil {
 		return 0, 0, 0, err
