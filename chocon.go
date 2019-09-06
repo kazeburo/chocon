@@ -12,12 +12,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/fukata/golang-stats-api-handler"
+	stats_api "github.com/fukata/golang-stats-api-handler"
 	"github.com/jessevdk/go-flags"
 	"github.com/kazeburo/chocon/accesslog"
 	"github.com/kazeburo/chocon/pidfile"
 	"github.com/kazeburo/chocon/proxy"
 	"github.com/kazeburo/chocon/stats"
+	"github.com/kazeburo/chocon/upstream"
 	ss "github.com/lestrrat/go-server-starter-listener"
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/fasthttpadaptor"
@@ -41,6 +42,7 @@ type cmdOpts struct {
 	WriteTimeout     int           `long:"write-timeout" default:"90" description:"timeout of writing response"`
 	ProxyReadTimeout int           `long:"proxy-read-timeout" default:"60" description:"timeout of reading response from upstream"`
 	ShutdownTimeout  time.Duration `long:"shutdown-timeout" default:"1h"  description:"timeout to wait for all connections to be closed."`
+	Upstream         string        `long:"upstream" default:"" description:"upstream server: http://upstream-server/"`
 	StatsBufsize     int           `long:"stsize" default:"1000" description:"buffer size for http stats"`
 	StatsSpfactor    int           `long:"spfactor" default:"3" description:"sampling factor for http stats"`
 	Insecure         bool          `long:"insecure" description:"disable certificate verifications (only for debugging)"`
@@ -93,6 +95,12 @@ func _main() int {
 
 	logger, _ := zap.NewProduction()
 
+	upstream, err := upstream.New(opts.Upstream, logger)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	if opts.PidFile != "" {
 		if err := pidfile.WritePid(opts.PidFile); err != nil {
 			log.Fatal(err)
@@ -106,10 +114,11 @@ func _main() int {
 	}
 
 	proxy := proxy.New(&fasthttp.Client{
+		ReadTimeout:         time.Duration(opts.ProxyReadTimeout) * time.Second,
 		TLSConfig:           tlsClientConfig,
 		MaxConnsPerHost:     opts.MaxConnsPerHost,
 		MaxIdleConnDuration: 30 * time.Second,
-	}, Version, logger)
+	}, Version, logger, upstream)
 
 	al, err := accesslog.New(opts.LogDir, opts.LogRotate)
 

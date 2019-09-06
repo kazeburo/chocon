@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kazeburo/chocon/upstream"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 
@@ -100,6 +101,7 @@ func (s *mockServer) hostForProxy() string {
 }
 
 func (s *mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("some-key-from-server", "some-value-from-server")
 	w.WriteHeader(s.statusCode)
 
 	time.Sleep(time.Millisecond * 10)
@@ -160,10 +162,10 @@ func testProxy(t *testing.T, fn func(t *testing.T, client *http.Client)) {
 			}
 
 			// This never gets called.
-			panic("invalid dialing")
+			panic(fmt.Sprintf("invalid dialing: %s", addr))
 		},
 		TLSConfig: &tls.Config{InsecureSkipVerify: true},
-	}, "", zap.NewNop())
+	}, "", zap.NewNop(), &upstream.Upstream{})
 
 	// Get the servers running.
 	for _, server := range servers {
@@ -212,6 +214,7 @@ func testProxyOneRequest(t *testing.T, client *http.Client, target *mockServer, 
 	assert.ElementsMatch(t, resBody, target.response(method, reqBody), "the response body should be correct")
 	assert.Equal(t, target.lastRequest.Header.Get("some-key"), "some-value", "header values should have been passed to the target")
 	assert.NotZero(t, res.Header.Get("x-chocon-id"), "x-chocon-id header value should be set")
+	assert.Equal(t, "some-value-from-server", res.Header.Get("some-key-from-server"), "header values should be passed from the target server to the client")
 }
 
 func TestProxyGETSingle(t *testing.T) {
