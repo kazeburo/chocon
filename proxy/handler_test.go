@@ -5,9 +5,11 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -56,93 +58,34 @@ func TestRewriteHost(t *testing.T) {
 	}
 }
 
-// mockServer implements http.Handler.
-type mockServer struct {
+type testServer struct {
 	host  string
-	port  uint
+	port  int
 	https bool
-	// Stores the most recent request.
-	lastRequest     *http.Request
-	lastRequestLock *sync.Mutex
-	// Status codes for every response is set to this value.
-	statusCode int
+	h     http.HandlerFunc
 }
 
-// The return value of this function is written to response bodies.
-func (s *mockServer) response(method string, reqBody []byte) []byte {
-	if method == "GET" {
-		return []byte(fmt.Sprintf("hello from %s", s.host))
-	}
-
-	// For non-GET requests, the request body is echoed back to the client.
-	return reqBody
+func (s *testServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.h(w, r)
 }
 
-// The output of this function will be like 'foo.com.ccnproxy', 'foo.com.ccnproxy:3000' or 'foo.com.ccnproxy-ssl'.
-// The proxy expects them to be set in the host header for selecting the target server.
-func (s *mockServer) hostForProxy() string {
-	host := s.host
-
-	if s.https {
-		host += ".ccnproxy-ssl"
-
-		if s.port != 443 {
-			host += fmt.Sprintf(":%d", s.port)
-		}
-	} else {
-		host += ".ccnproxy"
-
-		if s.port != 80 {
-			host += fmt.Sprintf(":%d", s.port)
-		}
-	}
-
-	return host
-}
-
-func (s *mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("some-key-from-server", "some-value-from-server")
-	w.WriteHeader(s.statusCode)
-
-	time.Sleep(time.Millisecond * 10)
-
-	s.lastRequestLock.Lock()
-	s.lastRequest = r
-	s.lastRequestLock.Unlock()
-
-	reqBody, err := ioutil.ReadAll(r.Body)
-
-	if err != nil {
-		w.WriteHeader(400)
-		return
-	}
-
-	if _, err := w.Write(s.response(r.Method, reqBody)); err != nil {
-		w.WriteHeader(400)
-		return
-	}
-}
-
-var servers = []*mockServer{
-	{"foo.com", 80, false, nil, &sync.Mutex{}, 200},
-	{"bar.com", 3000, false, nil, &sync.Mutex{}, 200},
-	{"baz.com", 443, true, nil, &sync.Mutex{}, 200},
-	{"qux.com", 80, false, nil, &sync.Mutex{}, 404},
-}
-
-// Sets up a client, a proxy, an echo server, and connections among them.
-// Then `fn` is called with the client.
-func testProxy(t *testing.T, fn func(t *testing.T, client *http.Client)) {
+// Sets up a client, a proxy, servers, and connections among them.
+// Then `fn` is called with the client whose requests are routed to the proxy.
+func testProxy(
+	t *testing.T,
+	servers []*testServer,
+	fn func(client *http.Client),
+) {
 	// This is used for client-proxy connection.
 	ln := fasthttputil.NewInmemoryListener()
 
 	// These are used for proxy-server connections.
-	lns := make(map[*mockServer]*fasthttputil.InmemoryListener)
-	for _, server := range servers {
-		lns[server] = fasthttputil.NewInmemoryListener()
+	lns := make([]*fasthttputil.InmemoryListener, 0, len(servers))
+	for range servers {
+		lns = append(lns, fasthttputil.NewInmemoryListener())
 	}
 
-	// Requests from this are forwarded to chocon.
+	// Requests from this are forwarded to proxy.
 	client := &http.Client{
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -155,34 +98,35 @@ func testProxy(t *testing.T, fn func(t *testing.T, client *http.Client)) {
 	proxy := New(&fasthttp.Client{
 		Dial: func(addr string) (net.Conn, error) {
 			// Find the matching server.
-			for k, v := range lns {
-				if fmt.Sprintf("%s:%d", k.host, k.port) == addr {
-					return v.Dial()
+			for i, ln := range lns {
+				if fmt.Sprintf("%s:%d", servers[i].host, servers[i].port) == addr {
+					return ln.Dial()
 				}
 			}
 
-			// This never gets called.
+			// This should never get called.
 			panic(fmt.Sprintf("invalid dialing: %s", addr))
 		},
 		TLSConfig: &tls.Config{InsecureSkipVerify: true},
 	}, "", zap.NewNop(), &upstream.Upstream{})
 
 	// Get the servers running.
-	for _, server := range servers {
-		go func(s *mockServer) {
+	for i := range servers {
+		go func(i int) {
 			var err error
 
-			if s.https {
-				err = http.ServeTLS(lns[s], s, "../example.cert", "../example.key")
+			if servers[i].https {
+				err = http.ServeTLS(lns[i], servers[i], "../example.cert", "../example.key")
 			} else {
-				err = http.Serve(lns[s], s)
+				err = http.Serve(lns[i], servers[i])
 			}
 
 			if err != nil {
 				t.Fatal(err)
 			}
-		}(server)
+		}(i)
 	}
+
 	// Get the proxy running.
 	go func() {
 		err := fasthttp.Serve(ln, proxy.Handler)
@@ -192,85 +136,161 @@ func testProxy(t *testing.T, fn func(t *testing.T, client *http.Client)) {
 		}
 	}()
 
-	fn(t, client)
+	fn(client)
 }
 
-func testProxyOneRequest(t *testing.T, client *http.Client, target *mockServer, method string, reqBody []byte) {
-	req, err := http.NewRequest(method, "http://...", bytes.NewBuffer(reqBody))
-	req.Header.Add("some-key", "some-value")
-	if err != nil {
-		t.Fatal(err)
+func TestProxyGET(t *testing.T) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(100 * time.Millisecond)
+		assert.Equal(t, "GET", r.Method)
+		w.Header().Set("some-key", "some-value")
+		w.Write([]byte("OK"))
 	}
-	req.Host = target.hostForProxy()
-	res, err := client.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resBody, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, res.StatusCode, target.statusCode, "should return the correct status code")
-	assert.ElementsMatch(t, resBody, target.response(method, reqBody), "the response body should be correct")
-	assert.Equal(t, target.lastRequest.Header.Get("some-key"), "some-value", "header values should have been passed to the target")
-	assert.NotZero(t, res.Header.Get("x-chocon-id"), "x-chocon-id header value should be set")
-	assert.Equal(t, "some-value-from-server", res.Header.Get("some-key-from-server"), "header values should be passed from the target server to the client")
-}
 
-func TestProxyGETSingle(t *testing.T) {
-	testProxy(t, func(t *testing.T, client *http.Client) {
-		testProxyOneRequest(t, client, servers[0], "GET", nil)
-	})
-}
-
-func TestProxyPOSTSingle(t *testing.T) {
-	testProxy(t, func(t *testing.T, client *http.Client) {
-		testProxyOneRequest(t, client, servers[0], "POST", []byte("request"))
-	})
-}
-
-func TestProxyPostConcurrentLarge(t *testing.T) {
-	reqBody := ""
-	for i := 0; i < 100000; i++ {
-		reqBody += "a"
-	}
-	testProxy(t, func(t *testing.T, client *http.Client) {
-		testProxyOneRequest(t, client, servers[0], "POST", []byte(reqBody))
-	})
-}
-
-func TestProxyPOSTSerial(t *testing.T) {
-	testProxy(t, func(t *testing.T, client *http.Client) {
-		for i, server := range servers {
-			for j := 0; j < 10; j++ {
-				testProxyOneRequest(t, client, server, "POST", []byte(fmt.Sprintf("request %d %d", i, j)))
+	testProxy(
+		t,
+		[]*testServer{
+			{"foo.com", 3000, false, handler},
+			{"bar.com", 443, true, handler},
+		},
+		func(client *http.Client) {
+			f := func(host string) {
+				req, err := http.NewRequest("GET", "http://...", nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				req.Host = host
+				res, err := client.Do(req)
+				if err != nil {
+					t.Fatal(err)
+				}
+				resBody, err := ioutil.ReadAll(res.Body)
+				if err != nil {
+					t.Fatal(err)
+				}
+				assert.Equal(t, "OK", string(resBody), "correct response body should be returned")
+				assert.Equal(t, 200, res.StatusCode, "status code should be 200")
+				assert.Equal(t, "some-value", res.Header.Get("some-key"), "header values should be passed from server to client")
+				assert.NotZero(t, res.Header.Get("x-chocon-id"), "x-chocon-id header value should be set")
 			}
-		}
-	})
+
+			t.Run("Serial", func(t *testing.T) {
+				f("foo.com.ccnproxy:3000")
+				f("bar.com.ccnproxy-secure")
+			})
+
+			t.Run("Concurrent", func(t *testing.T) {
+				var wg sync.WaitGroup
+				for i := 0; i < 100; i++ {
+					wg.Add(2)
+					go func() {
+						defer wg.Done()
+						f("bar.com.ccnproxy-secure")
+					}()
+					go func() {
+						defer wg.Done()
+						f("foo.com.ccnproxy:3000")
+					}()
+				}
+				wg.Wait()
+			})
+		},
+	)
 }
 
-func TestProxyGETSerial(t *testing.T) {
-	testProxy(t, func(t *testing.T, client *http.Client) {
-		for _, server := range servers {
-			for j := 0; j < 10; j++ {
-				testProxyOneRequest(t, client, server, "GET", nil)
-			}
+func TestProxyPOST(t *testing.T) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(100 * time.Millisecond)
+		assert.Equal(t, "POST", r.Method)
+		assert.Equal(t, "some-value", r.Header.Get("some-key"), "header values should be passed from client to server")
+		w.WriteHeader(201)
+		_, err := io.Copy(w, r.Body)
+		if err != nil {
+			t.Fatal(err)
 		}
-	})
+	}
+
+	testProxy(
+		t,
+		[]*testServer{
+			{"foo.com", 3000, false, handler},
+			{"bar.com", 443, true, handler},
+		},
+		func(client *http.Client) {
+			f := func(host string) {
+				someLongString := strings.Repeat(time.Now().Format("2006-01-02T15:04:05"), 100)
+				req, err := http.NewRequest("POST", "http://...", bytes.NewBufferString(someLongString))
+				req.Header.Set("some-key", "some-value")
+				if err != nil {
+					t.Fatal(err)
+				}
+				req.Host = host
+				res, err := client.Do(req)
+				if err != nil {
+					t.Fatal(err)
+				}
+				resBody, err := ioutil.ReadAll(res.Body)
+				if err != nil {
+					t.Fatal(err)
+				}
+				assert.Equal(t, someLongString, string(resBody))
+				assert.Equal(t, 201, res.StatusCode)
+			}
+
+			t.Run("Serial", func(t *testing.T) {
+				f("foo.com.ccnproxy:3000")
+				f("bar.com.ccnproxy-secure")
+			})
+
+			t.Run("Concurrent", func(t *testing.T) {
+				var wg sync.WaitGroup
+				for i := 0; i < 100; i++ {
+					wg.Add(2)
+					go func() {
+						defer wg.Done()
+						f("foo.com.ccnproxy:3000")
+					}()
+					go func() {
+						defer wg.Done()
+						f("bar.com.ccnproxy-secure")
+					}()
+				}
+				wg.Wait()
+			})
+		},
+	)
 }
 
-func TestProxyPOSTConcurrent(t *testing.T) {
-	testProxy(t, func(t *testing.T, client *http.Client) {
-		var wg sync.WaitGroup
-		for i, server := range servers {
-			for j := 0; j < 100; j++ {
-				wg.Add(1)
-				go func(i, j int, server *mockServer) {
-					defer wg.Done()
-					testProxyOneRequest(t, client, server, "POST", []byte(fmt.Sprintf("request %d %d", i, j)))
-				}(i, j, server)
+func TestProxyDELETE(t *testing.T) {
+	testProxy(
+		t,
+		[]*testServer{
+			{
+				"foo.com", 3000, false,
+				func(w http.ResponseWriter, r *http.Request) {
+					assert.Equal(t, "DELETE", r.Method)
+					_, err := w.Write([]byte("OK"))
+					if err != nil {
+						t.Fatal(err)
+					}
+				},
+			},
+		},
+		func(client *http.Client) {
+			req, err := http.NewRequest("DELETE", "http://...", nil)
+			if err != nil {
+				t.Fatal(err)
 			}
-		}
-		wg.Wait()
-	})
+			req.Host = "foo.com.ccnproxy:3000"
+			res, err := client.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resBody, err := ioutil.ReadAll(res.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assert.Equal(t, "OK", string(resBody))
+		},
+	)
 }
