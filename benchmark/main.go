@@ -121,20 +121,6 @@ func run(
 		defer choconContainer.Stop()
 	}
 
-	// Make sure that the network and the containers gets removed/stopped.
-	c := make(chan os.Signal)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-c
-		network.Remove()
-		serverContainer.Stop()
-		clientContainer.Stop()
-		if useChocon {
-			choconContainer.Stop()
-		}
-		os.Exit(1)
-	}()
-
 	// Add network latencies between containers.
 	if _, _, err := serverContainer.Execute(
 		"tc", "qdisc", "add", "dev", "eth0", "root", "netem", "delay",
@@ -302,6 +288,15 @@ func main() {
 		"success", "fail", "responseTime",
 	)
 
+	// When the program has received SIGTERM, 'exit' is set to true.
+	exit := false
+	sigCh := make(chan os.Signal)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-sigCh
+		exit = true
+	}()
+
 	for _, bodySize := range c.BodySize.slice(100) {
 		for _, latency := range c.Latency.slice(100) {
 			for _, duration := range c.Duration.slice(30) {
@@ -311,6 +306,10 @@ func main() {
 							for _, useChocon := range c.UseChocon.slice(true) {
 								for _, concurrency := range c.Concurrency.slice(10) {
 									for _, keepAlive := range c.KeepAlive.slice(true) {
+										if exit {
+											return
+										}
+
 										// When chocon is not used, memoryLimit and cpuLimit have no effects.
 										if !useChocon && (memoryLimitIdx != 0 || cpuLimitIdx != 0) {
 											continue
