@@ -10,4 +10,4 @@ RUN curl -s https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 ADD Gopkg.toml Gopkg.lock ./
 RUN /root/go/bin/dep ensure --vendor-only
 ADD . .
-CMD ["go", "run", "chocon.go", "--insecure", "--port=80"]
+CMD ["go", "run", "chocon.go", "--insecure", "--port=80", "--max-conns-per-host=5000"]
