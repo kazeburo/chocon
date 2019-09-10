@@ -143,6 +143,7 @@ func TestProxyGET(t *testing.T) {
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(100 * time.Millisecond)
 		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "/", r.URL.Path)
 		w.Header().Set("some-key", "some-value")
 		w.Write([]byte("OK"))
 	}
@@ -202,6 +203,7 @@ func TestProxyPOST(t *testing.T) {
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(100 * time.Millisecond)
 		assert.Equal(t, "POST", r.Method)
+		assert.Equal(t, "/some-path", r.URL.Path, "the request path should be passed from client to server")
 		assert.Equal(t, "some-value", r.Header.Get("some-key"), "header values should be passed from client to server")
 		w.WriteHeader(201)
 		_, err := io.Copy(w, r.Body)
@@ -219,7 +221,7 @@ func TestProxyPOST(t *testing.T) {
 		func(client *http.Client) {
 			f := func(host string) {
 				someLongString := strings.Repeat(time.Now().Format("2006-01-02T15:04:05"), 100)
-				req, err := http.NewRequest("POST", "http://...", bytes.NewBufferString(someLongString))
+				req, err := http.NewRequest("POST", "http://.../some-path", bytes.NewBufferString(someLongString))
 				req.Header.Set("some-key", "some-value")
 				if err != nil {
 					t.Fatal(err)
