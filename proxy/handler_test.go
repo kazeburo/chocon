@@ -205,6 +205,7 @@ func TestProxyPOST(t *testing.T) {
 		assert.Equal(t, "POST", r.Method)
 		assert.Equal(t, "/some-path", r.URL.Path, "the request path should be passed from client to server")
 		assert.Equal(t, "some-value", r.Header.Get("some-key"), "header values should be passed from client to server")
+		assert.Equal(t, "foo", r.URL.Query().Get("a"), "query parameters should be passed from client to server")
 		w.WriteHeader(201)
 		_, err := io.Copy(w, r.Body)
 		if err != nil {
@@ -221,7 +222,7 @@ func TestProxyPOST(t *testing.T) {
 		func(client *http.Client) {
 			f := func(host string) {
 				someLongString := strings.Repeat(time.Now().Format("2006-01-02T15:04:05"), 100)
-				req, err := http.NewRequest("POST", "http://.../some-path", bytes.NewBufferString(someLongString))
+				req, err := http.NewRequest("POST", "http://.../some-path?a=foo", bytes.NewBufferString(someLongString))
 				req.Header.Set("some-key", "some-value")
 				if err != nil {
 					t.Fatal(err)
