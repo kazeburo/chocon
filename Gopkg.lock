@@ -2,149 +2,128 @@
 
 
 [[projects]]
-  digest = "1:ffe9824d294da03b391f44e1ae8281281b4afc1bdaa9588c9097785e3af10cec"
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
-  pruneopts = "UT"
   revision = "8991bc29aa16c548c550c7ff78260e27b9ab7c73"
   version = "v1.1.1"
 
 [[projects]]
-  digest = "1:e846038327cd6adb9b52a34c8f2056bd76e1e382ab45b3ccc0308754b6bb1e41"
   name = "github.com/fukata/golang-stats-api-handler"
   packages = ["."]
-  pruneopts = "UT"
   revision = "90f0b59102629831cc109845475a8d77043412ec"
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:a2cff208d4759f6ba1b1cd228587b0a1869f95f22542ec9cd17fff64430113c7"
   name = "github.com/jessevdk/go-flags"
   packages = ["."]
-  pruneopts = "UT"
   revision = "c6ca198ec95c841fdb89fc0de7496fed11ab854e"
   version = "v1.4.0"
 
 [[projects]]
+  name = "github.com/klauspost/compress"
+  packages = ["flate","gzip","zlib"]
+  revision = "2c38f6d2dc5a6a21b6851f2414f4e10adf8e3eee"
+  version = "v1.8.1"
+
+[[projects]]
+  name = "github.com/klauspost/cpuid"
+  packages = ["."]
+  revision = "05a8198c0f5a27739aec358908d7e12c64ce6eb7"
+  version = "v1.2.1"
+
+[[projects]]
   branch = "master"
-  digest = "1:9904710a1dbfea647822b49dc605718ff5e82dfc4964a92e19b0a829780ea499"
   name = "github.com/lestrrat-go/file-rotatelogs"
-  packages = [
-    ".",
-    "internal/option",
-  ]
-  pruneopts = "UT"
+  packages = [".","internal/option"]
   revision = "cf4bc193a5a5685cfc62f3e75b0376b45a40116e"
 
 [[projects]]
   branch = "master"
-  digest = "1:8654122ef85f2bc03859b0a7ea2d36c9965888689cdac7640cceaa6edb11cff6"
   name = "github.com/lestrrat-go/strftime"
   packages = ["."]
-  pruneopts = "UT"
   revision = "8b31f9c59b0feb56c456ce49a7b3d2b2e93a6f18"
 
 [[projects]]
   branch = "master"
-  digest = "1:c6705c94837b3a99691bf88ad55632abc971b0466f7c02c7e8f89ef4cfdf1661"
   name = "github.com/lestrrat/go-server-starter-listener"
   packages = ["."]
-  pruneopts = "UT"
   revision = "00dd68592c85334ce94a28199ec7961352c0ba6d"
 
 [[projects]]
-  digest = "1:246ab598a22ea9d50f46e65f655f78161a19822f6597268b02f04af998684807"
   name = "github.com/montanaflynn/stats"
   packages = ["."]
-  pruneopts = "UT"
   revision = "1bf9dbcd8cbe1fdb75add3785b1d4a9a646269ab"
   version = "0.3.0"
 
 [[projects]]
-  digest = "1:cf31692c14422fa27c83a05292eb5cbe0fb2775972e8f1f8446a71549bd8980b"
   name = "github.com/pkg/errors"
   packages = ["."]
-  pruneopts = "UT"
   revision = "ba968bfe8b2f7e042a574c888954fccecfa385b4"
   version = "v0.8.1"
 
 [[projects]]
-  digest = "1:0028cb19b2e4c3112225cd871870f2d9cf49b9b4276531f03438a88e94be86fe"
   name = "github.com/pmezard/go-difflib"
   packages = ["difflib"]
-  pruneopts = "UT"
   revision = "792786c7400a136282c1664665ae0a8db921c6c2"
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:2e76a73cb51f42d63a2a1a85b3dc5731fd4faf6821b434bd0ef2c099186031d6"
   name = "github.com/rs/xid"
   packages = ["."]
-  pruneopts = "UT"
   revision = "15d26544def341f036c5f8dca987a4cbe575032c"
   version = "v1.2.1"
 
 [[projects]]
-  digest = "1:972c2427413d41a1e06ca4897e8528e5a1622894050e2f527b38ddf0f343f759"
   name = "github.com/stretchr/testify"
   packages = ["assert"]
-  pruneopts = "UT"
   revision = "ffdc059bfe9ce6a4e144ba849dbedead332c6053"
   version = "v1.3.0"
 
 [[projects]]
+  name = "github.com/valyala/bytebufferpool"
+  packages = ["."]
+  revision = "e746df99fe4a3986f4d4f79e13c1e0117ce9c2f7"
+  version = "v1.0.0"
+
+[[projects]]
+  name = "github.com/valyala/fasthttp"
+  packages = [".","fasthttputil","stackless"]
+  revision = "1bd0404cedf0148dca83663870e12cf8b156c7f7"
+  version = "v1.4.0"
+
+[[projects]]
   branch = "master"
-  digest = "1:74a950aa035c7f5dcff3c1c18b1098be107e4cf029120050686e2e31cb871029"
   name = "go.mercari.io/go-httpstats"
   packages = ["."]
-  pruneopts = "UT"
   revision = "34fb78524912335cbb8c0bbef6358f0f2278795b"
 
 [[projects]]
-  digest = "1:a5158647b553c61877aa9ae74f4015000294e47981e6b8b07525edcbb0747c81"
   name = "go.uber.org/atomic"
   packages = ["."]
-  pruneopts = "UT"
   revision = "df976f2515e274675050de7b3f42545de80594fd"
   version = "v1.4.0"
 
 [[projects]]
-  digest = "1:60bf2a5e347af463c42ed31a493d817f8a72f102543060ed992754e689805d1a"
   name = "go.uber.org/multierr"
   packages = ["."]
-  pruneopts = "UT"
   revision = "3c4937480c32f4c13a875a1829af76c98ca3d40a"
   version = "v1.1.0"
 
 [[projects]]
-  digest = "1:676160e6a4722b08e0e26b11521d575c2cb2b6f0c679e1ee6178c5d8dee51e5e"
   name = "go.uber.org/zap"
-  packages = [
-    ".",
-    "buffer",
-    "internal/bufferpool",
-    "internal/color",
-    "internal/exit",
-    "zapcore",
-  ]
-  pruneopts = "UT"
+  packages = [".","buffer","internal/bufferpool","internal/color","internal/exit","zapcore"]
   revision = "27376062155ad36be76b0f12cf1572a221d3a48c"
   version = "v1.10.0"
+
+[[projects]]
+  name = "gopkg.in/yaml.v2"
+  packages = ["."]
+  revision = "51d6538a90f86fe93ac480b35f37b2be17fef232"
+  version = "v2.2.2"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  input-imports = [
-    "github.com/fukata/golang-stats-api-handler",
-    "github.com/jessevdk/go-flags",
-    "github.com/lestrrat-go/file-rotatelogs",
-    "github.com/lestrrat/go-server-starter-listener",
-    "github.com/pkg/errors",
-    "github.com/rs/xid",
-    "github.com/stretchr/testify/assert",
-    "go.mercari.io/go-httpstats",
-    "go.uber.org/zap",
-    "go.uber.org/zap/zapcore",
-  ]
+  inputs-digest = "2e514e47cfa6b2b1523a10de5c824d98aa56fb23ec4af7d879992499ea4e5f20"
   solver-name = "gps-cdcl"
   solver-version = 1

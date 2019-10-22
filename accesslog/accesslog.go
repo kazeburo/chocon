@@ -2,13 +2,13 @@ package accesslog
 
 import (
 	"io"
-	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	"github.com/pkg/errors"
+	"github.com/valyala/fasthttp"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -77,76 +77,32 @@ func New(logDir string, logRotate int64) (*AccessLog, error) {
 	}, nil
 }
 
-// WrapHandleFunc :
-func (al *AccessLog) WrapHandleFunc(h http.Handler) http.Handler {
+// Wrap adds logging to a request handler.
+func (al *AccessLog) Wrap(h fasthttp.RequestHandler) fasthttp.RequestHandler {
 	if al.logger == nil {
 		return h
 	}
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+	return func(ctx *fasthttp.RequestCtx) {
 		start := time.Now()
-		ww := WrapWriter(w)
 		defer func() {
 			end := time.Now()
 			ptime := end.Sub(start)
-			remoteAddr := r.RemoteAddr
-			if i := strings.LastIndexByte(remoteAddr, ':'); i > -1 {
-				remoteAddr = remoteAddr[:i]
-			}
 			al.logger.Info(
 				"-",
 				zap.String("time", start.Format("2006/01/02 15:04:05 MST")),
-				zap.String("remote_addr", remoteAddr),
-				zap.String("method", r.Method),
-				zap.String("uri", r.URL.Path),
-				zap.Int("status", ww.GetCode()),
-				zap.Int("size", ww.GetSize()),
-				zap.String("ua", r.UserAgent()),
+				zap.String("remote_addr", ctx.RemoteIP().String()),
+				zap.ByteString("method", ctx.Method()),
+				zap.ByteString("uri", ctx.RequestURI()),
+				zap.Int("status", ctx.Response.StatusCode()),
+				zap.Int("size", len(ctx.Response.Body())),
+				zap.ByteString("ua", ctx.UserAgent()),
 				zap.Float64("ptime", ptime.Seconds()),
-				zap.String("host", r.Host),
-				zap.String("chocon_req", w.Header().Get("X-Chocon-Id")),
+				zap.ByteString("host", ctx.Host()),
+				zap.ByteString("chocon_req", ctx.Response.Header.Peek("X-Chocon-Id")),
 			)
 		}()
-		h.ServeHTTP(ww, r)
-	})
-}
 
-// Writer :
-type Writer struct {
-	w    http.ResponseWriter
-	size int
-	code int
-}
-
-// WrapWriter :
-func WrapWriter(w http.ResponseWriter) *Writer {
-	return &Writer{
-		w: w,
+		h(ctx)
 	}
-}
-
-// Header :
-func (w *Writer) Header() http.Header {
-	return w.w.Header()
-}
-
-// Write :
-func (w *Writer) Write(b []byte) (int, error) {
-	w.size += len(b)
-	return w.w.Write(b)
-}
-
-// WriteHeader :
-func (w *Writer) WriteHeader(statusCode int) {
-	w.code = statusCode
-	w.w.WriteHeader(statusCode)
-}
-
-// GetCode :
-func (w *Writer) GetCode() int {
-	return w.code
-}
-
-// GetSize :
-func (w *Writer) GetSize() int {
-	return w.size
 }

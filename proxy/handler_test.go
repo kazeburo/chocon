@@ -1,84 +1,299 @@
 package proxy
 
 import (
+	"bytes"
+	"context"
+	"crypto/tls"
 	"fmt"
-	"log"
+	"io"
+	"io/ioutil"
+	"net"
 	"net/http"
-	"net/url"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/kazeburo/chocon/upstream"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
+
+	"github.com/valyala/fasthttp"
+	"github.com/valyala/fasthttp/fasthttputil"
 )
 
-var (
-	dummyProxy   *Proxy
-	dummyRequest *http.Request
-	dummyURL     *url.URL
-)
+func BenchmarkRewriteHost(b *testing.B) {
+	originalReq := fasthttp.AcquireRequest()
+	req := fasthttp.AcquireRequest()
+	originalReq.SetHost("example.com.ccnproxy:3000")
 
-func init() {
-	dummyProxy = &Proxy{}
-	var err error
-	dummyRequest, err = createDummyRequest()
-	if err != nil {
-		log.Fatal(err)
+	for n := 0; n < b.N; n++ {
+		rewriteHost(req, originalReq)
 	}
 }
 
-func createDummyRequest() (*http.Request, error) {
-	dummyHeaders := http.Header{
-		"User-Agent":          {"dummy-client"},
-		"X-Chocon-Test-Value": {"6"},
-		// ignored headers
-		"Connection":          {"Keep-Alive"},
-		"Keep-Alive":          {"timeout=30, max=100"},
-		"Proxy-Authenticate":  {"Basic"},
-		"Proxy-Authorization": {"Basic dummy"},
-		"Te":                  {"deflate"},
-		"Trailers":            {"Expires"},
-		"Transfer-Encoding":   {"chunked"},
-		"Upgrade":             {"WebSocket"},
+func TestRewriteHost(t *testing.T) {
+	cases := []struct {
+		originalReqHost string
+		reqHost         string
+		scheme          string
+	}{
+		{"example.com.ccnproxy:3000", "example.com:3000", "http"},
+		{"example.com.ccnproxy", "example.com", "http"},
+		{"example.com.ccnproxy.local:3000", "example.com:3000", "http"},
+		{"example.com.ccnproxy.local", "example.com", "http"},
+		{"example.com.ccnproxy-ssl:3000", "example.com:3000", "https"},
+		{"example.com.ccnproxy-ssl", "example.com", "https"},
 	}
-	dummyURL = &url.URL{
-		Scheme: "http",
-		Path:   "/dummy",
-	}
-	req, err := http.NewRequest("GET", "/dummy", nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header = dummyHeaders
-	req.Close = true
-	req.Proto = "HTTP/1.0"
-	req.ProtoMajor = 1
-	req.ProtoMinor = 0
-	req.URL = dummyURL
 
-	return req, nil
+	for _, c := range cases {
+		t.Run(c.originalReqHost, func(t *testing.T) {
+			originalReq := fasthttp.AcquireRequest()
+			req := fasthttp.AcquireRequest()
+			originalReq.SetHost(c.originalReqHost)
+			rewriteHost(req, originalReq)
+			assert.Equal(t, string(req.Host()), c.reqHost)
+			assert.Equal(t, string(req.URI().Scheme()), c.scheme)
+		})
+	}
 }
 
-func TestCopyRequest(t *testing.T) {
-	req := dummyProxy.copyRequest(dummyRequest)
+type testServer struct {
+	host  string
+	port  int
+	https bool
+	h     http.HandlerFunc
+}
 
-	assert.Equal(t, req.Proto, "HTTP/1.1")
-	assert.Equal(t, req.ProtoMajor, 1)
-	assert.Equal(t, req.ProtoMinor, 1)
-	assert.Equal(t, req.Close, false)
-	assert.Equal(t, req.URL.Scheme, "http")
-	assert.Equal(t, req.URL.Path, dummyURL.Path)
+func (s *testServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.h(w, r)
+}
 
-	assert.Equal(t, req.Header["User-Agent"][0], "dummy-client")
-	assert.Equal(t, req.Header["X-Chocon-Test-Value"][0], "6")
+// Sets up a client, a proxy, servers, and connections among them.
+// Then `fn` is called with the client whose requests are routed to the proxy.
+func testProxy(
+	t *testing.T,
+	servers []*testServer,
+	fn func(client *http.Client),
+) {
+	// This is used for client-proxy connection.
+	ln := fasthttputil.NewInmemoryListener()
 
-	for k, _ := range req.Header {
-		if _, ok := ignoredHeaderNames[k]; ok {
-			assert.Fail(t, fmt.Sprintf("header filed: %s must be removed", k))
+	// These are used for proxy-server connections.
+	lns := make([]*fasthttputil.InmemoryListener, 0, len(servers))
+	for range servers {
+		lns = append(lns, fasthttputil.NewInmemoryListener())
+	}
+
+	// Requests from this are forwarded to proxy.
+	client := &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return ln.Dial()
+			},
+		},
+		Timeout: time.Second * 3,
+	}
+
+	proxy := New(&fasthttp.Client{
+		Dial: func(addr string) (net.Conn, error) {
+			// Find the matching server.
+			for i, ln := range lns {
+				if fmt.Sprintf("%s:%d", servers[i].host, servers[i].port) == addr {
+					return ln.Dial()
+				}
+			}
+
+			// This should never get called.
+			panic(fmt.Sprintf("invalid dialing: %s", addr))
+		},
+		TLSConfig: &tls.Config{InsecureSkipVerify: true},
+	}, "", zap.NewNop(), &upstream.Upstream{})
+
+	// Get the servers running.
+	for i := range servers {
+		go func(i int) {
+			var err error
+
+			if servers[i].https {
+				err = http.ServeTLS(lns[i], servers[i], "../example.cert", "../example.key")
+			} else {
+				err = http.Serve(lns[i], servers[i])
+			}
+
+			if err != nil {
+				t.Fatal(err)
+			}
+		}(i)
+	}
+
+	// Get the proxy running.
+	go func() {
+		err := fasthttp.Serve(ln, proxy.Handler)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	fn(client)
+}
+
+func TestProxyGET(t *testing.T) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(100 * time.Millisecond)
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "/", r.URL.Path)
+		w.Header().Set("some-key", "some-value")
+		w.Write([]byte("OK"))
+	}
+
+	testProxy(
+		t,
+		[]*testServer{
+			{"foo.com", 3000, false, handler},
+			{"bar.com", 443, true, handler},
+		},
+		func(client *http.Client) {
+			f := func(host string) {
+				req, err := http.NewRequest("GET", "http://...", nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				req.Host = host
+				res, err := client.Do(req)
+				if err != nil {
+					t.Fatal(err)
+				}
+				resBody, err := ioutil.ReadAll(res.Body)
+				if err != nil {
+					t.Fatal(err)
+				}
+				assert.Equal(t, "OK", string(resBody), "correct response body should be returned")
+				assert.Equal(t, 200, res.StatusCode, "status code should be 200")
+				assert.Equal(t, "some-value", res.Header.Get("some-key"), "header values should be passed from server to client")
+				assert.NotZero(t, res.Header.Get("x-chocon-id"), "x-chocon-id header value should be set")
+			}
+
+			t.Run("Serial", func(t *testing.T) {
+				f("foo.com.ccnproxy:3000")
+				f("bar.com.ccnproxy-secure")
+			})
+
+			t.Run("Concurrent", func(t *testing.T) {
+				var wg sync.WaitGroup
+				for i := 0; i < 100; i++ {
+					wg.Add(2)
+					go func() {
+						defer wg.Done()
+						f("bar.com.ccnproxy-secure")
+					}()
+					go func() {
+						defer wg.Done()
+						f("foo.com.ccnproxy:3000")
+					}()
+				}
+				wg.Wait()
+			})
+		},
+	)
+}
+
+func TestProxyPOST(t *testing.T) {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(100 * time.Millisecond)
+		assert.Equal(t, "POST", r.Method)
+		assert.Equal(t, "/some-path", r.URL.Path, "the request path should be passed from client to server")
+		assert.Equal(t, "some-value", r.Header.Get("some-key"), "header values should be passed from client to server")
+		assert.Equal(t, "foo", r.URL.Query().Get("a"), "query parameters should be passed from client to server")
+		w.WriteHeader(201)
+		_, err := io.Copy(w, r.Body)
+		if err != nil {
+			t.Fatal(err)
 		}
 	}
+
+	testProxy(
+		t,
+		[]*testServer{
+			{"foo.com", 3000, false, handler},
+			{"bar.com", 443, true, handler},
+		},
+		func(client *http.Client) {
+			f := func(host string) {
+				someLongString := strings.Repeat(time.Now().Format("2006-01-02T15:04:05"), 100)
+				req, err := http.NewRequest("POST", "http://.../some-path?a=foo", bytes.NewBufferString(someLongString))
+				req.Header.Set("some-key", "some-value")
+				if err != nil {
+					t.Fatal(err)
+				}
+				req.Host = host
+				res, err := client.Do(req)
+				if err != nil {
+					t.Fatal(err)
+				}
+				resBody, err := ioutil.ReadAll(res.Body)
+				if err != nil {
+					t.Fatal(err)
+				}
+				assert.Equal(t, someLongString, string(resBody))
+				assert.Equal(t, 201, res.StatusCode)
+			}
+
+			t.Run("Serial", func(t *testing.T) {
+				f("foo.com.ccnproxy:3000")
+				f("bar.com.ccnproxy-secure")
+			})
+
+			t.Run("Concurrent", func(t *testing.T) {
+				var wg sync.WaitGroup
+				for i := 0; i < 100; i++ {
+					wg.Add(2)
+					go func() {
+						defer wg.Done()
+						f("foo.com.ccnproxy:3000")
+					}()
+					go func() {
+						defer wg.Done()
+						f("bar.com.ccnproxy-secure")
+					}()
+				}
+				wg.Wait()
+			})
+		},
+	)
 }
 
-func BenchmarkCopyRequest(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		_ = dummyProxy.copyRequest(dummyRequest)
-	}
+func TestProxyDELETE(t *testing.T) {
+	testProxy(
+		t,
+		[]*testServer{
+			{
+				"foo.com", 3000, false,
+				func(w http.ResponseWriter, r *http.Request) {
+					assert.Equal(t, "DELETE", r.Method)
+					_, err := w.Write([]byte("OK"))
+					if err != nil {
+						t.Fatal(err)
+					}
+				},
+			},
+		},
+		func(client *http.Client) {
+			req, err := http.NewRequest("DELETE", "http://...", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Host = "foo.com.ccnproxy:3000"
+			res, err := client.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resBody, err := ioutil.ReadAll(res.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assert.Equal(t, "OK", string(resBody))
+		},
+	)
 }
