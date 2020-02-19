@@ -14,13 +14,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/fukata/golang-stats-api-handler"
+	stats_api "github.com/fukata/golang-stats-api-handler"
 	"github.com/jessevdk/go-flags"
 	"github.com/kazeburo/chocon/accesslog"
 	"github.com/kazeburo/chocon/pidfile"
 	"github.com/kazeburo/chocon/proxy"
 	"github.com/kazeburo/chocon/upstream"
-	"github.com/lestrrat/go-server-starter-listener"
+	ss "github.com/lestrrat/go-server-starter-listener"
 	statsHTTP "go.mercari.io/go-httpstats"
 	"go.uber.org/zap"
 )
@@ -34,7 +34,8 @@ type cmdOpts struct {
 	Listen           string        `short:"l" long:"listen" default:"0.0.0.0" description:"address to bind"`
 	Port             string        `short:"p" long:"port" default:"3000" description:"Port number to bind"`
 	LogDir           string        `long:"access-log-dir" default:"" description:"directory to store logfiles"`
-	LogRotate        int64         `long:"access-log-rotate" default:"30" description:"Number of day before remove logs"`
+	LogRotate        int64         `long:"access-log-rotate" default:"30" description:"Number of rotation before remove logs"`
+	LogRotateTime    int64         `long:"access-log-rotate-time" default:"1440" description:"Interval minutes between file rotation"`
 	Version          bool          `short:"v" long:"version" description:"Show version"`
 	PidFile          string        `long:"pid-file" default:"" description:"filename to store pid. disabled by default"`
 	KeepaliveConns   int           `short:"c" default:"2" long:"keepalive-conns" description:"maximum keepalive connections for upstream"`
@@ -66,8 +67,8 @@ func addStatsHandler(h http.Handler, mw *statsHTTP.Metrics) http.Handler {
 	})
 }
 
-func wrapLogHandler(h http.Handler, logDir string, logRotate int64, logger *zap.Logger) http.Handler {
-	al, err := accesslog.New(logDir, logRotate)
+func wrapLogHandler(h http.Handler, logDir string, logRotate int64, logRotateTime int64, logger *zap.Logger) http.Handler {
+	al, err := accesslog.New(logDir, logRotate, logRotateTime)
 	if err != nil {
 		logger.Fatal("could not init accesslog", zap.Error(err))
 	}
@@ -143,7 +144,7 @@ func _main() int {
 		log.Fatal(err)
 	}
 	handler = addStatsHandler(handler, statsChocon)
-	handler = wrapLogHandler(handler, opts.LogDir, opts.LogRotate, logger)
+	handler = wrapLogHandler(handler, opts.LogDir, opts.LogRotate, opts.LogRotateTime, logger)
 	handler = wrapStatsHandler(handler, statsChocon)
 
 	server := http.Server{
