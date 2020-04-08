@@ -21,7 +21,7 @@ import (
 	"github.com/kazeburo/chocon/proxy"
 	"github.com/kazeburo/chocon/upstream"
 	ss "github.com/lestrrat/go-server-starter-listener"
-	statsHTTP "go.mercari.io/go-httpstats"
+	statsHTTP "github.com/mercari/go-httpstats"
 	"go.uber.org/zap"
 )
 
