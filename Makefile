@@ -3,14 +3,6 @@ LDFLAGS=-ldflags "-X main.Version=${VERSION}"
 
 all: chocon
 
-.PHONY: chocon
-
-bundle:
-	dep ensure
-
-update:
-	dep ensure -update
-
 chocon: chocon.go
 	go build $(LDFLAGS) chocon.go
 
