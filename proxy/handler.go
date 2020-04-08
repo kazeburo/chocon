@@ -100,17 +100,16 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, originalRequest *http.
 		return
 	}
 
-	logger := proxy.logger.With(
-		zap.String("request_host", originalRequest.Host),
-		zap.String("request_path", originalRequest.URL.Path),
-		zap.String("proxy_host", proxyRequest.URL.Host),
-		zap.String("proxy_scheme", proxyRequest.URL.Scheme),
-		zap.String("proxy_id", proxyID),
-	)
-
 	// Convert a request into a response by using its Transport.
 	response, err := proxy.Transport.RoundTrip(proxyRequest)
 	if err != nil {
+		logger := proxy.logger.With(
+			zap.String("request_host", originalRequest.Host),
+			zap.String("request_path", originalRequest.URL.Path),
+			zap.String("proxy_host", proxyRequest.URL.Host),
+			zap.String("proxy_scheme", proxyRequest.URL.Scheme),
+			zap.String("proxy_id", proxyID),
+		)
 		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 			logger.Error("ErrorFromProxy", zap.Error(err))
 			writer.WriteHeader(http.StatusGatewayTimeout)
