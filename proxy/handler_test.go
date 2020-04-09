@@ -70,7 +70,7 @@ func TestCopyRequest(t *testing.T) {
 	assert.Equal(t, req.Header["User-Agent"][0], "dummy-client")
 	assert.Equal(t, req.Header["X-Chocon-Test-Value"][0], "6")
 
-	for k, _ := range req.Header {
+	for k := range req.Header {
 		if _, ok := ignoredHeaderNames[k]; ok {
 			assert.Fail(t, fmt.Sprintf("header filed: %s must be removed", k))
 		}
@@ -80,5 +80,47 @@ func TestCopyRequest(t *testing.T) {
 func BenchmarkCopyRequest(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = dummyProxy.copyRequest(dummyRequest)
+	}
+}
+
+func BenchmarkRewriteHost(b *testing.B) {
+	status := &Status{Code: http.StatusOK}
+	originalReq, _ := http.NewRequest("GET", "/dummy", nil)
+	originalReq.URL.Host = "example.com.ccnproxy:3000"
+	originalReq.Host = originalReq.URL.Host
+	req, _ := http.NewRequest("GET", "/dummy", nil)
+	req.URL.Scheme = "http"
+	for n := 0; n < b.N; n++ {
+		dummyProxy.rewriteProxyHost(originalReq, req, status)
+	}
+}
+
+func TestRewriteHost(t *testing.T) {
+	cases := []struct {
+		originalReqHost string
+		reqHost         string
+		scheme          string
+	}{
+		{"example.com.ccnproxy:3000", "example.com:3000", "http"},
+		{"example.com.ccnproxy", "example.com", "http"},
+		{"example.com.ccnproxy.local:3000", "example.com:3000", "http"},
+		{"example.com.ccnproxy.local", "example.com", "http"},
+		{"example.com.ccnproxy-ssl:3000", "example.com:3000", "https"},
+		{"example.com.ccnproxy-ssl", "example.com", "https"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.originalReqHost, func(t *testing.T) {
+			status := &Status{Code: http.StatusOK}
+			originalReq, _ := http.NewRequest("GET", "/dummy", nil)
+			req, _ := http.NewRequest("GET", "/dummy", nil)
+			req.URL.Scheme = "http"
+			originalReq.URL.Host = c.originalReqHost
+			originalReq.Host = originalReq.URL.Host
+			dummyProxy.rewriteProxyHost(originalReq, req, status)
+			assert.Equal(t, status.Code, http.StatusOK)
+			assert.Equal(t, req.Host, c.reqHost)
+			assert.Equal(t, req.URL.Scheme, c.scheme)
+		})
 	}
 }
