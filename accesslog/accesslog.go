@@ -39,7 +39,7 @@ func logWriter(logDir string, logRotate int64, logRotateTime int64) (io.Writer, 
 	rl, err := rotatelogs.New(
 		logFile,
 		rotatelogs.WithLinkName(linkName),
-		rotatelogs.WithMaxAge(time.Duration(logRotate)*86400*time.Second),
+		rotatelogs.WithMaxAge(time.Duration(logRotate*60*logRotateTime)*time.Second),
 		rotatelogs.WithRotationTime(time.Second*time.Duration(logRotateTime)*60),
 	)
 	if err != nil {
