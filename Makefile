@@ -1,4 +1,4 @@
-VERSION=0.12.0
+VERSION=0.12.1
 LDFLAGS=-ldflags "-X main.Version=${VERSION}"
 
 all: chocon
