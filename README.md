@@ -15,7 +15,6 @@ go get -u github.com/kazeburo/chocon
 # Build
 
 ```
-make bundle
 make
 ```
 
