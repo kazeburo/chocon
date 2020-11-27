@@ -8,14 +8,15 @@
 
 # Installation
 
-```
-go get -u github.com/kazeburo/chocon
-```
+download from release page or build from source
 
-# Build
+## build from source
+
+git clone this repository and
 
 ```
-make
+$ make
+$ cp chocon /path/to/bin
 ```
 
 # Run

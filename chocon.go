@@ -26,8 +26,8 @@ import (
 )
 
 var (
-	// Version chocon version
-	Version string
+	// version chocon version
+	version string
 )
 
 type cmdOpts struct {
@@ -101,7 +101,7 @@ func printVersion() {
 	fmt.Printf(`chocon %s
 Compiler: %s %s
 `,
-		Version,
+		version,
 		runtime.Compiler,
 		runtime.Version())
 }
@@ -137,7 +137,7 @@ func _main() int {
 	}
 
 	transport := makeTransport(opts.KeepaliveConns, opts.MaxConnsPerHost, opts.ProxyReadTimeout)
-	var handler http.Handler = proxy.New(&transport, Version, upstream, logger)
+	var handler http.Handler = proxy.New(&transport, version, upstream, logger)
 
 	statsChocon, err := statsHTTP.NewCapa(opts.StatsBufsize, opts.StatsSpfactor)
 	if err != nil {

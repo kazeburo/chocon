@@ -5,11 +5,13 @@ builds:
       - linux
     goarch:
       - amd64
-    ldflags:
-     - -X main.Version={{.Version}}
-archive:
-  format: zip
-  name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+      - arm64
+    ignore:
+      - goos: darwin
+        goarch: arm64
+archives:
+  - format: zip
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
 release:
   github:
     owner: kazeburo
