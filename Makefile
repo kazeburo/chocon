@@ -1,5 +1,5 @@
 VERSION=0.12.1
-LDFLAGS=-ldflags "-X main.Version=${VERSION}"
+LDFLAGS=-ldflags "-w -s -X main.version=${VERSION}"
 
 all: chocon
 
@@ -22,4 +22,3 @@ tag:
 	git tag v${VERSION}
 	git push origin v${VERSION}
 	git push origin master
-	goreleaser --rm-dist

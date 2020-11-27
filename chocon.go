@@ -26,8 +26,8 @@ import (
 )
 
 var (
-	// Version chocon version
-	Version string
+	// version chocon version
+	version string
 )
 
 type cmdOpts struct {
@@ -101,7 +101,7 @@ func printVersion() {
 	fmt.Printf(`chocon %s
 Compiler: %s %s
 `,
-		Version,
+		version,
 		runtime.Compiler,
 		runtime.Version())
 }
