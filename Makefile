@@ -1,4 +1,4 @@
-VERSION=0.12.2
+VERSION=0.12.3
 LDFLAGS=-ldflags "-w -s -X main.version=${VERSION}"
 
 all: chocon
