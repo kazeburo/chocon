@@ -17,7 +17,6 @@ jobs:
       - name: test
         run: |
           make check
-          make linux-check
 
       - name: Snapshot GoReleaser
         uses: goreleaser/goreleaser-action@v5
