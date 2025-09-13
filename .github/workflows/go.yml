@@ -1,22 +1,26 @@
-name: Go
-on: [push]
+name: test
+on:
+  push:
+    branches:
+      - "**"
 jobs:
   test:
-    name: Build
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go: ["1.17.x"]
+    permissions:
+      contents: read
     steps:
-      - name: Set up Go
-        uses: actions/setup-go@v1
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v4
         with:
-          go-version: ${{ matrix.go }}
-        id: go
-
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v2
+          go-version-file: go.mod
 
       - name: test
         run: |
           make check
+          make linux-check
+
+      - name: Snapshot GoReleaser
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          version: latest
+          args: build --snapshot

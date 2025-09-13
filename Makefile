@@ -18,7 +18,3 @@ fmt:
 clean:
 	rm -rf chocon chocon-*.tar.gz
 
-tag:
-	git tag v${VERSION}
-	git push origin v${VERSION}
-	git push origin master
