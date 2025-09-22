@@ -11,21 +11,21 @@ jobs:
       pull-requests: write
       issues: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
-      - uses: Songmu/tagpr@v1
+      - uses: Songmu/tagpr@9c294c8b7b1815a5f3b7c61d6ee6aa50ac25b030 # v1
         id: tagpr
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe # v4
         with:
           go-version-file: go.mod
         if: ${{ steps.tagpr.outputs.tag != ''}}
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@5742e2a039330cbb23ebf35f046f814d4c6ff811 # v5
         with:
           version: latest
           args: release --clean
