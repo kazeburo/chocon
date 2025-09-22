@@ -1,5 +1,8 @@
 # Changelog
 
+## [v0.12.7](https://github.com/kazeburo/chocon/compare/v0.12.6...v0.12.7) - 2025-09-22
+- pin actions commithash by @kazeburo in https://github.com/kazeburo/chocon/pull/53
+
 ## [v0.12.6](https://github.com/kazeburo/chocon/compare/v0.12.5...v0.12.6) - 2025-09-13
 - use tagpr for release by @kazeburo in https://github.com/kazeburo/chocon/pull/50
 - update deps by @kazeburo in https://github.com/kazeburo/chocon/pull/52
